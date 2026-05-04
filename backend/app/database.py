@@ -9,7 +9,12 @@ from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from .config import settings
 
 
-engine = create_engine(settings.database_url, pool_pre_ping=True)
+# Railway 등 일부 호스팅이 postgres:// 형태로 주는 경우 SQLAlchemy 호환 형식으로 변환
+_db_url = settings.database_url
+if _db_url.startswith("postgres://"):
+    _db_url = _db_url.replace("postgres://", "postgresql://", 1)
+
+engine = create_engine(_db_url, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 

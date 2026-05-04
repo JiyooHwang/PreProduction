@@ -23,7 +23,9 @@ COPY backend/app ./backend/app
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONPATH=/app/backend
+ENV PORT=8000
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--app-dir", "/app/backend"]
+# Railway / 클라우드 호환을 위해 $PORT 사용 (없으면 8000)
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} --app-dir /app/backend"]

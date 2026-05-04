@@ -4,16 +4,120 @@
 Excel 샷 리스트**를 만들어 주는 사내 웹 앱입니다. 장편/시리즈 애니메이션 프리프로덕션을
 위해 설계되었습니다.
 
-## 두 가지 사용 방법
+## 사용 방법
 
 | 방식 | 적합 상황 | 셋업 |
 |------|---------|------|
-| **A. 웹 앱 (추천)** | 팀 10명이 사내에서 같이 사용 | Docker Compose 한 방 |
-| **B. CLI** | 본인 PC에서 단독 작업 | `pip install -e .` |
+| **A. 클라우드 배포 (Railway) — 팀 데모/리뷰용** | 여러 명이 링크 하나로 바로 확인 | GitHub 연결 + 환경변수 |
+| **B. 사내 서버 (Docker Compose) — 정식 운영용** | 회사 PC에 띄워 LAN 공유 | `docker compose up -d` |
+| **C. CLI 단독** | 본인 PC에서 혼자 작업 | `pip install -e .` |
 
 ---
 
-## A. 웹 앱 (사내 서버에 배포)
+## A. Railway 클라우드 배포 (팀 공유용)
+
+URL 하나로 팀 전원이 즉시 사용. 무료 크레딧으로 데모 충분.
+
+### 1. 사전 준비
+
+- GitHub에 이 레포가 푸시되어 있어야 함 (이미 main 브랜치에 있음)
+- Railway 계정 — <https://railway.app> (GitHub 로그인)
+- 결제수단 등록 (무료 크레딧 한도 내에선 청구 안 됨)
+- Google Cloud Console 계정 (OAuth 클라이언트 발급용)
+
+### 2. Railway에 PostgreSQL + 두 개 서비스 만들기
+
+1. Railway 대시보드에서 **New Project → Deploy from GitHub repo** → 이 레포 선택
+2. 자동 생성되는 서비스를 **삭제**하고 (그냥 시작점으로 쓰는 게 편함), 다음 3개를 차례로 추가:
+
+#### 2-1. PostgreSQL
+
+- **+ New → Database → Add PostgreSQL**
+- 자동으로 `DATABASE_URL` 변수가 발급됨. 다른 서비스에서 참조 가능.
+
+#### 2-2. Backend 서비스
+
+- **+ New → GitHub Repo** → 이 레포 선택
+- 서비스 이름: `backend`
+- **Settings → Source**:
+  - **Root Directory**: `/` (기본)
+  - **Dockerfile Path**: `backend/Dockerfile`
+- **Settings → Networking → Generate Domain** 클릭 → 백엔드 URL 받음
+  (예: `backend-production-xxxx.up.railway.app`)
+- **Variables** 탭에서 다음 등록:
+  ```
+  DATABASE_URL = ${{Postgres.DATABASE_URL}}
+  GOOGLE_CLIENT_ID = (3단계에서 발급)
+  ALLOWED_EMAIL_DOMAIN = company.com  (선택, 비우면 모든 Google 계정 허용)
+  STORAGE_DIR = /app/storage
+  UPLOAD_DIR = /app/uploads
+  MAX_CONCURRENT_JOBS = 2
+  CORS_ORIGINS = https://(프런트 URL — 4단계 이후 채움)
+  ```
+
+#### 2-3. Frontend 서비스
+
+- **+ New → GitHub Repo** → 같은 레포 다시 선택
+- 서비스 이름: `frontend`
+- **Settings → Source**:
+  - **Root Directory**: `frontend`
+  - **Dockerfile Path**: `Dockerfile`
+- **Settings → Networking → Generate Domain** 클릭 → 프런트 URL 받음
+- **Variables** 탭에서 다음 등록:
+  ```
+  NEXTAUTH_URL = https://(프런트 URL)
+  NEXTAUTH_SECRET = (openssl rand -base64 32 으로 생성한 긴 랜덤 문자열)
+  GOOGLE_CLIENT_ID = (3단계에서 발급)
+  GOOGLE_CLIENT_SECRET = (3단계에서 발급)
+  ALLOWED_EMAIL_DOMAIN = company.com  (선택)
+  NEXT_PUBLIC_API_URL = https://(백엔드 URL)
+  ```
+- 마지막 변수는 **빌드 타임에 박힙니다**. 백엔드 URL이 바뀌면 frontend를 재빌드 해야 합니다.
+
+### 3. Google OAuth 클라이언트 발급
+
+1. <https://console.cloud.google.com> → 프로젝트 생성/선택
+2. **APIs & Services → Credentials → + Create Credentials → OAuth client ID**
+3. Application type: **Web application**
+4. **Authorized JavaScript origins**:
+   ```
+   https://(프런트 Railway URL)
+   ```
+5. **Authorized redirect URIs**:
+   ```
+   https://(프런트 Railway URL)/api/auth/callback/google
+   ```
+6. 발급된 **Client ID / Client Secret** 을 Railway 백엔드/프런트 변수에 입력
+7. Backend의 `CORS_ORIGINS` 도 프런트 URL로 채움
+8. Railway에서 **두 서비스 모두 Redeploy** 트리거
+
+### 4. 첫 접속
+
+1. 프런트 Railway URL 접속 → **Google 로그인**
+2. 회사 도메인 계정으로 로그인 (도메인 제한 설정한 경우)
+3. 우측 상단 **설정 → Gemini API 키** 입력
+   - <https://aistudio.google.com> 에서 본인 계정으로 무료 키 발급
+4. **새 프로젝트 만들기 → 영상 업로드 → 분석 → Excel 다운로드**
+
+### 5. 팀에 공유
+
+프런트 Railway URL을 슬랙/카톡에 공유. 각자 Google 로그인 + 본인 Gemini 키 등록 후 사용.
+
+### 운영 메모
+
+- **무료 크레딧**: 월 $5 정도. 트래픽 작은 데모는 충분. 24시간 상시 운영하면 한 달 후 부족할 수 있음.
+- **썸네일 보관**: Railway 컨테이너는 재배포 시 휘발됨. 영구 보관하려면 Backend 서비스에 **Volume** 을 마운트해 `/app/storage` 에 연결 (Railway → Backend → Settings → Volumes).
+- **영상 업로드 한도**: Railway 프록시 기본값으로는 큰 영상이 막힐 수 있음. 데모용으로는 5분 이내 클립 권장. 장편 풀길이는 사내 서버(B 옵션) 추천.
+- **로그 보기**: Railway 대시보드의 각 서비스 → Logs 탭
+
+### 사내 서버로 이주 (운영 전환)
+
+데모가 OK면 같은 코드를 옵션 B (사내 PC + Docker Compose) 로 옮겨서 운영하면 됩니다.
+큰 영상 처리는 사내 LAN이 압도적으로 빠릅니다.
+
+---
+
+## B. 사내 서버 (Docker Compose)
 
 ### 출력 화면
 
@@ -93,7 +197,7 @@ docker compose up -d --build
 
 ---
 
-## B. CLI 단독 사용
+## C. CLI 단독 사용
 
 웹 앱 없이 본인 PC에서 단독으로 영상을 처리할 때 사용합니다.
 
