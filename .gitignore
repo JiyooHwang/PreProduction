@@ -1,21 +1,39 @@
+# Python
 __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
 venv/
 env/
+
+# Env / secrets
 .env
 .env.local
+.env.*.local
 
+# CLI 출력
 output/
 *.xlsx
 *.csv
 frames/
 
+# Node / Next.js
+node_modules/
+.next/
+.turbo/
+out/
+*.tsbuildinfo
+
+# Docker volumes (로컬 테스트)
+backend/storage/
+backend/uploads/
+
+# Editor
 .idea/
 .vscode/
 .DS_Store
 Thumbs.db
 
+# Build
 build/
 dist/
