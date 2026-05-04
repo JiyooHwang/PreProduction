@@ -9,8 +9,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 # NEXT_PUBLIC_* 변수는 빌드 시점에 JS 번들에 박힙니다.
 # Railway에서는 Build-time Variables 로 같은 이름을 노출하면 자동 전달됩니다.
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ARG NEXT_PUBLIC_DEMO_MODE=false
+ENV NEXT_PUBLIC_DEMO_MODE=${NEXT_PUBLIC_DEMO_MODE}
 ENV NEXT_TELEMETRY_DISABLED=1
 RUN npm run build
 

@@ -45,10 +45,24 @@ def _verify_google_token(token: str) -> dict:
     return info
 
 
+def _get_or_create_demo_user(db: Session) -> User:
+    user = db.query(User).filter(User.email == "demo@local").first()
+    if user is None:
+        user = User(email="demo@local", name="Demo User", picture=None)
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+    return user
+
+
 def get_current_user(
     authorization: str = Header(default=""),
     db: Session = Depends(get_db),
 ) -> User:
+    if settings.demo_mode:
+        # 인증 우회: 단일 공용 demo 계정 반환
+        return _get_or_create_demo_user(db)
+
     if not authorization.lower().startswith("bearer "):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

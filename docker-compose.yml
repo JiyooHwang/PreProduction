@@ -20,7 +20,8 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       DATABASE_URL: postgresql://shotbreakdown:${POSTGRES_PASSWORD:-shotbreakdown}@postgres:5432/shotbreakdown
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      DEMO_MODE: ${DEMO_MODE:-false}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       ALLOWED_EMAIL_DOMAIN: ${ALLOWED_EMAIL_DOMAIN:-}
       STORAGE_DIR: /app/storage
       UPLOAD_DIR: /app/uploads
@@ -41,19 +42,32 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+        # NEXT_PUBLIC_DEMO_MODE은 빌드 타임에 JS 번들에 박힘
+        NEXT_PUBLIC_DEMO_MODE: ${DEMO_MODE:-false}
     environment:
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
-      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-demo-secret-change-me}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       ALLOWED_EMAIL_DOMAIN: ${ALLOWED_EMAIL_DOMAIN:-}
-      NEXT_PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8000}
+      # Next.js rewrite 가 사용 (서버사이드 프록시)
+      BACKEND_URL: http://backend:8000
     depends_on:
       - backend
     ports:
       - "3000:3000"
     restart: unless-stopped
+
+  # 데모 모드: 별도 OAuth/도메인 없이 외부에서 접근 가능한 URL 생성
+  # docker compose --profile demo up 으로 활성화. 로그에 trycloudflare.com URL 출력됨.
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    command: tunnel --no-autoupdate --url http://frontend:3000
+    depends_on:
+      - frontend
+    restart: unless-stopped
+    profiles:
+      - demo
 
 volumes:
   pgdata:

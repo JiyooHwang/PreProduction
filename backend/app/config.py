@@ -11,6 +11,9 @@ class Settings(BaseSettings):
 
     database_url: str = "postgresql://shotbreakdown:shotbreakdown@localhost:5432/shotbreakdown"
 
+    # 데모 모드: true면 Google OAuth 검증 건너뛰고 단일 demo 계정으로 동작 (팀 데모용)
+    demo_mode: bool = False
+
     # Google OAuth
     google_client_id: str = ""
     allowed_email_domain: str = ""  # 예: company.com (비워두면 모든 도메인 허용)

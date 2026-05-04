@@ -8,9 +8,75 @@ Excel 샷 리스트**를 만들어 주는 사내 웹 앱입니다. 장편/시리
 
 | 방식 | 적합 상황 | 셋업 |
 |------|---------|------|
-| **A. 클라우드 배포 (Railway) — 팀 데모/리뷰용** | 여러 명이 링크 하나로 바로 확인 | GitHub 연결 + 환경변수 |
-| **B. 사내 서버 (Docker Compose) — 정식 운영용** | 회사 PC에 띄워 LAN 공유 | `docker compose up -d` |
+| **0. 초간단 데모 (OAuth 없음 + 무료 터널)** | 팀에 링크만 던져 5분만에 보여주기 | `docker compose --profile demo up` |
+| **A. Railway 클라우드** | OAuth 정식 + 영구 URL | GitHub 연결 + 환경변수 |
+| **B. 사내 서버** | 회사 PC LAN 공유, 정식 운영 | `docker compose up -d` |
 | **C. CLI 단독** | 본인 PC에서 혼자 작업 | `pip install -e .` |
+
+→ **처음이면 0번부터** 권장. Google Cloud Console 승인이나 Railway 가입 없이 바로 동작.
+
+---
+
+## 0. 초간단 데모 (OAuth 없이 + 무료 공개 URL)
+
+**조건**: Docker Desktop만 깔려 있으면 됩니다. Google Cloud Console, Railway, OAuth 발급 전부 불필요.
+
+**원리**:
+- 백엔드/프런트 둘 다 `DEMO_MODE` 로 띄우면 인증 검증을 건너뛰고 단일 공용 `demo` 계정으로 동작.
+- 같은 docker compose에 **Cloudflare Tunnel** 컨테이너를 함께 올려서 `*.trycloudflare.com` 임시 공개 URL 자동 발급. (Cloudflare 계정 가입도 불필요한 무료 quick tunnel.)
+
+### 실행
+
+**Windows PowerShell**:
+```powershell
+$env:DEMO_MODE="true"
+docker compose --profile demo up --build
+```
+
+**macOS / Linux**:
+```bash
+DEMO_MODE=true docker compose --profile demo up --build
+```
+
+빌드/기동까지 5~10분. 끝나면 한 터미널은 그대로 두고, **새 터미널**에서:
+
+```bash
+docker compose logs tunnel | grep trycloudflare
+```
+
+다음과 같은 줄이 나옵니다:
+
+```
+Your quick Tunnel has been created! Visit it at:
+https://random-words-here.trycloudflare.com
+```
+
+이 URL을 팀에 공유하면 됩니다. 누구든 클릭 → **Demo 시작** 버튼 → 즉시 사용.
+
+### 데모 모드 주의사항
+
+- 모든 사용자가 **하나의 공용 `demo` 계정**을 공유합니다.
+  → 누군가 등록한 Gemini 키를 다른 사람도 사용 (그래서 1인이 키 등록하면 팀 전체가 분석 가능)
+  → 누군가 만든 프로젝트가 다른 사람에게도 보임 (그게 데모의 목적)
+- 터널 URL은 **컨테이너 재시작 시 바뀝니다**. 영구 URL은 Railway나 사내 서버 모드 사용.
+- 영상 업로드 한도: 약 100MB (Cloudflare quick tunnel 제한). **5분 이내 짧은 클립**으로 데모.
+- 인증이 없으니 **공유한 URL을 받은 사람은 누구든 접근 가능**. 외부 유출 주의.
+
+### Gemini 키 등록 (한 번만)
+
+데모 시작 후, 우측 상단 **설정** → Gemini API 키 입력. <https://aistudio.google.com>에서 본인 Google 계정으로 무료 발급. 키는 demo 계정에 저장되므로 한 명만 등록하면 됩니다.
+
+### 종료
+
+```bash
+docker compose --profile demo down
+```
+
+데이터(프로젝트/샷/썸네일)는 Docker volume에 남아서 다음에 다시 띄우면 그대로 보입니다. 완전 초기화하려면:
+
+```bash
+docker compose --profile demo down -v
+```
 
 ---
 

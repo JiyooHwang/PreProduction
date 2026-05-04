@@ -3,7 +3,10 @@
 import { useSession } from "next-auth/react";
 import useSWR, { SWRConfiguration } from "swr";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// 백엔드는 Next.js 서버 rewrite를 통해 같은 도메인 /api/backend/* 로 프록시됨.
+// 결과적으로 브라우저는 항상 프런트 도메인만 호출 → 클라우드플레어 터널 등으로
+// 프런트만 노출해도 백엔드까지 동작.
+const API_URL = "/api/backend";
 
 export type Project = {
   id: number;
