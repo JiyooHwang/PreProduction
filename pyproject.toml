@@ -1,0 +1,25 @@
+[project]
+name = "shotbreakdown"
+version = "0.1.0"
+description = "애니메이션 샷 브레이크다운 도구"
+requires-python = ">=3.10"
+dependencies = [
+    "scenedetect[opencv]>=0.6.4",
+    "google-genai>=0.3.0",
+    "openpyxl>=3.1",
+    "pydantic>=2.0",
+    "typer>=0.12",
+    "python-dotenv>=1.0",
+    "pillow>=10.0",
+    "rich>=13.0",
+]
+
+[project.scripts]
+shotbreakdown = "shotbreakdown.cli:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["shotbreakdown"]
