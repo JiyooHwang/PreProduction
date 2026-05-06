@@ -17,26 +17,32 @@ class DetectedScene(NamedTuple):
 def detect_shots(video_path: Path, threshold: float = 27.0) -> list[DetectedScene]:
     """영상에서 컷을 감지해 (start, end, fps) 리스트 반환.
 
-    ContentDetector + AdaptiveDetector 두 방식의 결과를 합쳐 누락을 줄임.
-    - ContentDetector: 색상 차이로 하드 컷 감지. threshold 낮을수록 민감.
-    - AdaptiveDetector: 주변 프레임 평균 대비 변화량으로 감지. 애니메이션의
-      잔잔한 모션 속 컷이나 약한 디졸브에 강함.
+    기본은 ContentDetector + AdaptiveDetector 결합으로 누락 줄임.
+    너무 잘게 쪼개지면 ENABLE_ADAPTIVE_DETECTOR=false 로 끄거나
+    MIN_SCENE_LEN_FRAMES, ADAPTIVE_THRESHOLD 를 올려 둔감하게 조절.
 
     threshold: ContentDetector 임계값. 22~27 권장.
     """
     min_scene_len = int(os.environ.get("MIN_SCENE_LEN_FRAMES", "12"))
+    adaptive_threshold = float(os.environ.get("ADAPTIVE_THRESHOLD", "3.0"))
+    use_adaptive = os.environ.get("ENABLE_ADAPTIVE_DETECTOR", "true").lower() != "false"
 
     cd_scenes = detect(
         str(video_path),
         ContentDetector(threshold=threshold, min_scene_len=min_scene_len),
     )
-    try:
-        ad_scenes = detect(
-            str(video_path),
-            AdaptiveDetector(adaptive_threshold=3.0, min_scene_len=min_scene_len),
-        )
-    except Exception:
-        ad_scenes = []
+    ad_scenes = []
+    if use_adaptive:
+        try:
+            ad_scenes = detect(
+                str(video_path),
+                AdaptiveDetector(
+                    adaptive_threshold=adaptive_threshold,
+                    min_scene_len=min_scene_len,
+                ),
+            )
+        except Exception:
+            ad_scenes = []
 
     if not cd_scenes and not ad_scenes:
         return []
