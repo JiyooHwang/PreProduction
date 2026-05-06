@@ -44,14 +44,26 @@ export default function ProjectDetailPage() {
             <h1 className="text-2xl font-bold mt-1">{project?.title ?? "..."}</h1>
             <div className="text-sm text-slate-500">{project?.owner_email}</div>
           </div>
-          {shots && shots.length > 0 && (
-            <a
-              href={api.exportUrl(id)}
-              className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700"
+          <div className="flex gap-2">
+            {shots && shots.length > 0 && (
+              <a
+                href={api.exportUrl(id)}
+                className="bg-emerald-600 text-white px-4 py-2 rounded-lg hover:bg-emerald-700"
+              >
+                Excel 다운로드
+              </a>
+            )}
+            <button
+              onClick={async () => {
+                if (!confirm(`'${project?.title ?? "이 프로젝트"}'를 삭제할까요? (업로드된 영상과 분석 결과가 모두 사라집니다)`)) return;
+                await api.deleteProject(id);
+                router.replace("/");
+              }}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
             >
-              Excel 다운로드
-            </a>
-          )}
+              프로젝트 삭제
+            </button>
+          </div>
         </div>
 
         <UploadForm projectId={id} onSubmitted={() => refreshJob()} />

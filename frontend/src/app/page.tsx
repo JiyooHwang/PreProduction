@@ -82,18 +82,32 @@ export default function HomePage() {
         <h2 className="font-semibold mb-3">프로젝트</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {projects?.map((p) => (
-            <Link
+            <div
               key={p.id}
-              href={`/projects/${p.id}`}
-              className="bg-white rounded-2xl shadow p-5 hover:shadow-md transition"
+              className="relative bg-white rounded-2xl shadow p-5 hover:shadow-md transition"
             >
-              <div className="font-semibold">{p.title}</div>
-              <div className="text-xs text-slate-500 mt-1">{p.owner_email}</div>
-              <div className="mt-3 flex justify-between text-sm text-slate-600">
-                <span>{p.shot_count}컷</span>
-                <span>{statusLabel(p.latest_job_status)}</span>
-              </div>
-            </Link>
+              <button
+                onClick={async (e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!confirm(`'${p.title}' 프로젝트를 삭제할까요? (업로드된 영상과 분석 결과가 모두 사라집니다)`)) return;
+                  await api.deleteProject(p.id);
+                  await mutate();
+                }}
+                className="absolute top-3 right-3 text-slate-400 hover:text-red-600 text-sm"
+                title="프로젝트 삭제"
+              >
+                ✕
+              </button>
+              <Link href={`/projects/${p.id}`} className="block">
+                <div className="font-semibold pr-6">{p.title}</div>
+                <div className="text-xs text-slate-500 mt-1">{p.owner_email}</div>
+                <div className="mt-3 flex justify-between text-sm text-slate-600">
+                  <span>{p.shot_count}컷</span>
+                  <span>{statusLabel(p.latest_job_status)}</span>
+                </div>
+              </Link>
+            </div>
           ))}
           {projects && projects.length === 0 && (
             <div className="text-slate-500 text-sm">아직 프로젝트가 없습니다.</div>
