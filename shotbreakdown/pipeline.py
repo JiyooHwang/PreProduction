@@ -1,6 +1,8 @@
 """컷 감지 → 프레임 추출 → 분석 → 샷 리스트 생성 파이프라인."""
 from __future__ import annotations
 
+import os
+import time
 from pathlib import Path
 from typing import Callable, Optional
 
@@ -9,6 +11,14 @@ from .extract import ensure_ffmpeg, extract_frame
 from .models import Shot
 from .providers.base import VisionProvider
 from .timecode import seconds_to_tc
+
+
+def _get_request_interval() -> float:
+    # Gemini 무료 한도(분당 15회)를 안 넘기려면 최소 4초 간격 필요. 기본 5초.
+    try:
+        return max(0.0, float(os.environ.get("GEMINI_REQUEST_INTERVAL", "5.0")))
+    except ValueError:
+        return 5.0
 
 
 ProgressCb = Callable[[int, int, str], None]
@@ -36,6 +46,7 @@ def build_shot_list(
     fps = scenes[0].fps
     shots: list[Shot] = []
     total = len(scenes)
+    request_interval = _get_request_interval() if vision is not None else 0.0
 
     for i, scene in enumerate(scenes, start=1):
         if on_progress:
@@ -67,6 +78,9 @@ def build_shot_list(
                 from .models import ShotAnalysis
 
                 analysis = ShotAnalysis(notes=f"분석 실패: {e}")
+
+            if request_interval > 0 and i < total:
+                time.sleep(request_interval)
 
         shots.append(
             Shot(

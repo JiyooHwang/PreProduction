@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -11,6 +12,18 @@ from PIL import Image
 from pydantic import ValidationError
 
 from ..models import ShotAnalysis
+
+
+def _is_rate_limit_error(exc: Exception) -> bool:
+    msg = str(exc).lower()
+    return "429" in msg or "rate" in msg or "quota" in msg or "resource_exhausted" in msg
+
+
+def _get_max_retries() -> int:
+    try:
+        return max(0, int(os.environ.get("GEMINI_MAX_RETRIES", "3")))
+    except ValueError:
+        return 3
 
 
 ANALYSIS_PROMPT = """당신은 애니메이션 프리프로덕션 어시스턴트입니다. 한 컷에서 추출한 \
@@ -76,17 +89,31 @@ class GeminiProvider:
 
         from google.genai import types
 
-        response = self._client.models.generate_content(
-            model=self._model,
-            contents=[*images, prompt],
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.2,
-            ),
+        config = types.GenerateContentConfig(
+            response_mime_type="application/json",
+            temperature=0.2,
         )
 
-        text = (response.text or "").strip()
-        return _parse_analysis(text)
+        max_retries = _get_max_retries()
+        last_exc: Optional[Exception] = None
+        for attempt in range(max_retries + 1):
+            try:
+                response = self._client.models.generate_content(
+                    model=self._model,
+                    contents=[*images, prompt],
+                    config=config,
+                )
+                text = (response.text or "").strip()
+                return _parse_analysis(text)
+            except Exception as exc:
+                last_exc = exc
+                if attempt >= max_retries or not _is_rate_limit_error(exc):
+                    raise
+                # 지수 백오프: 10s, 20s, 40s. 분당 한도 회복까지 대기.
+                time.sleep(10 * (2 ** attempt))
+
+        assert last_exc is not None
+        raise last_exc
 
 
 def _parse_analysis(text: str) -> ShotAnalysis:
