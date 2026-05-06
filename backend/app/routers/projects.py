@@ -137,6 +137,68 @@ async def create_job(
     return JobOut.model_validate(job)
 
 
+@router.post(
+    "/{project_id}/jobs/rerun",
+    response_model=JobOut,
+    status_code=status.HTTP_201_CREATED,
+)
+def rerun_job(
+    project_id: int,
+    threshold: Annotated[float, Form()] = 27.0,
+    skip_analysis: Annotated[bool, Form()] = False,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> JobOut:
+    """기존에 업로드된 영상을 새 threshold/옵션으로 재분석."""
+    project = _get_project_or_404(project_id, db)
+    if project.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="본인 프로젝트만 재분석할 수 있습니다.")
+
+    if not skip_analysis and not user.gemini_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="Gemini API 키가 등록되지 않았습니다. 프로필에서 먼저 키를 입력하세요.",
+        )
+
+    # 가장 최근 완료/실패한 job 의 영상 파일을 재사용
+    last_job = (
+        db.query(Job)
+        .filter(Job.project_id == project_id)
+        .order_by(desc(Job.created_at))
+        .first()
+    )
+    if not last_job:
+        raise HTTPException(
+            status_code=400,
+            detail="재분석할 영상이 없습니다. 먼저 영상을 업로드하세요.",
+        )
+
+    src_path = settings.upload_dir / f"job_{last_job.id}_{last_job.video_filename}"
+    if not src_path.exists():
+        raise HTTPException(
+            status_code=400,
+            detail="원본 영상 파일을 찾을 수 없습니다. 다시 업로드해주세요.",
+        )
+
+    new_job = Job(
+        project_id=project_id,
+        video_filename=last_job.video_filename,
+        threshold=threshold,
+        skip_analysis=skip_analysis,
+    )
+    db.add(new_job)
+    db.commit()
+    db.refresh(new_job)
+
+    # 새 job 용 파일 경로로 복사 (같은 영상 재사용)
+    target = settings.upload_dir / f"job_{new_job.id}_{new_job.video_filename}"
+    target.write_bytes(src_path.read_bytes())
+
+    enqueue(new_job.id)
+
+    return JobOut.model_validate(new_job)
+
+
 @router.get("/{project_id}/jobs", response_model=list[JobOut])
 def list_jobs(
     project_id: int,

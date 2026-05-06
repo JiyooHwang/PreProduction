@@ -6,9 +6,11 @@ import { useApi } from "@/lib/api";
 export function UploadForm({
   projectId,
   onSubmitted,
+  hasExistingVideo = false,
 }: {
   projectId: number;
   onSubmitted: () => void;
+  hasExistingVideo?: boolean;
 }) {
   const api = useApi();
   const [file, setFile] = useState<File | null>(null);
@@ -24,6 +26,20 @@ export function UploadForm({
     try {
       await api.uploadVideo(projectId, file, threshold, skipAnalysis);
       setFile(null);
+      onSubmitted();
+    } catch (e: any) {
+      setError(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const rerun = async () => {
+    if (!confirm(`민감도 ${threshold} 로 재분석할까요? 기존 분석 결과는 사라집니다.`)) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api.rerunJob(projectId, threshold, skipAnalysis);
       onSubmitted();
     } catch (e: any) {
       setError(e.message);
@@ -66,14 +82,24 @@ export function UploadForm({
         />
         AI 분석 생략 (컷 감지 + 썸네일만)
       </label>
-      <div className="mt-4 flex items-center gap-3">
+      <div className="mt-4 flex items-center gap-3 flex-wrap">
         <button
           onClick={submit}
           disabled={!file || busy}
           className="bg-slate-900 text-white px-5 py-2 rounded-lg disabled:opacity-50"
         >
-          {busy ? "업로드 중..." : "업로드 + 분석 시작"}
+          {busy ? "처리 중..." : "업로드 + 분석 시작"}
         </button>
+        {hasExistingVideo && (
+          <button
+            onClick={rerun}
+            disabled={busy}
+            className="bg-blue-600 text-white px-5 py-2 rounded-lg disabled:opacity-50 hover:bg-blue-700"
+            title="기존에 업로드한 영상을 새 민감도로 다시 분석"
+          >
+            🔄 같은 영상 재분석 (민감도 {threshold})
+          </button>
+        )}
         {error && <span className="text-red-600 text-sm">{error}</span>}
       </div>
 

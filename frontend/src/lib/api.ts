@@ -136,6 +136,21 @@ export function useApi() {
       return res.json() as Promise<Job>;
     },
 
+    rerunJob: async (
+      projectId: number,
+      threshold: number,
+      skipAnalysis: boolean,
+    ) => {
+      const fd = new FormData();
+      fd.append("threshold", String(threshold));
+      fd.append("skip_analysis", skipAnalysis ? "true" : "false");
+      const res = await request(token, `/api/projects/${projectId}/jobs/rerun`, {
+        method: "POST",
+        body: fd,
+      });
+      return res.json() as Promise<Job>;
+    },
+
     updateShot: async (projectId: number, shotId: number, patch: Partial<Shot>) => {
       const res = await request(token, `/api/projects/${projectId}/shots/${shotId}`, {
         method: "PATCH",

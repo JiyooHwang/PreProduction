@@ -66,7 +66,11 @@ export default function ProjectDetailPage() {
           </div>
         </div>
 
-        <UploadForm projectId={id} onSubmitted={() => refreshJob()} />
+        <UploadForm
+          projectId={id}
+          onSubmitted={() => refreshJob()}
+          hasExistingVideo={!!job}
+        />
 
         <JobProgress job={job ?? null} />
 
