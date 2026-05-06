@@ -76,9 +76,44 @@ export function UploadForm({
         </button>
         {error && <span className="text-red-600 text-sm">{error}</span>}
       </div>
-      <p className="text-xs text-slate-500 mt-2">
-        디졸브가 많으면 민감도를 22~25 정도로 낮춰 시도해 보세요. 액션이 격렬하면 30~32로 높임.
-      </p>
+
+      <details className="mt-4 text-sm">
+        <summary className="cursor-pointer text-slate-600 hover:text-slate-900 font-medium">
+          📖 컷 감지 민감도 가이드 (클릭해서 펼치기)
+        </summary>
+        <div className="mt-3 border border-slate-200 rounded-lg overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50">
+              <tr>
+                <th className="text-left px-4 py-2 font-medium">영상 종류</th>
+                <th className="text-left px-4 py-2 font-medium">추천 값</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              <tr>
+                <td className="px-4 py-2">디졸브 많음 (광고, MV)</td>
+                <td className="px-4 py-2 font-mono">22~25</td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2">일반 애니메이션</td>
+                <td className="px-4 py-2 font-mono">27~30</td>
+              </tr>
+              <tr className="bg-amber-50">
+                <td className="px-4 py-2">컷이 자주 잡힘 → 줄이기</td>
+                <td className="px-4 py-2 font-mono">30~35 ⭐</td>
+              </tr>
+              <tr>
+                <td className="px-4 py-2">액션, 흔들림 많음</td>
+                <td className="px-4 py-2 font-mono">32~38</td>
+              </tr>
+            </tbody>
+          </table>
+          <p className="text-xs text-slate-500 px-4 py-2 bg-slate-50">
+            값이 <strong>낮을수록 민감</strong>(컷 많이 잡힘), <strong>높을수록 둔감</strong>(컷 적게 잡힘).
+            기본값 27부터 시작해 결과 보고 조절하세요.
+          </p>
+        </div>
+      </details>
     </section>
   );
 }
