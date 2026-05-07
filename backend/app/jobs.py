@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from datetime import datetime
 from pathlib import Path
@@ -19,6 +20,11 @@ from .models import Job, JobStatus, Shot
 
 
 logger = logging.getLogger(__name__)
+
+
+def _should_delete_video_after() -> bool:
+    # 기본은 보존(=재분석 가능). 디스크 절약하려면 env 로 켜면 됨.
+    return os.environ.get("DELETE_VIDEO_AFTER_PROCESSING", "false").lower() == "true"
 
 
 _queue: "Queue[int]" = Queue()
@@ -139,11 +145,15 @@ def _run_job(job_id: int) -> None:
         except Exception:
             db.rollback()
     finally:
-        # 처리 끝난 영상은 삭제 (사용자가 영상 보관 안 한다고 확정함)
-        try:
-            video_path = settings.upload_dir / f"job_{job_id}_{db.get(Job, job_id).video_filename}"  # type: ignore[union-attr]
-            if video_path.exists():
-                video_path.unlink()
-        except Exception:
-            pass
+        # 기본은 영상 보존(=재분석 가능).
+        # DELETE_VIDEO_AFTER_PROCESSING=true 일 때만 삭제(디스크 절약용).
+        if _should_delete_video_after():
+            try:
+                j = db.get(Job, job_id)
+                if j is not None:
+                    video_path = settings.upload_dir / f"job_{job_id}_{j.video_filename}"
+                    if video_path.exists():
+                        video_path.unlink()
+            except Exception:
+                pass
         db.close()

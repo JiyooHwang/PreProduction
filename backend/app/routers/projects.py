@@ -93,6 +93,17 @@ def delete_project(
     project = _get_project_or_404(project_id, db)
     if project.owner_id != user.id:
         raise HTTPException(status_code=403, detail="본인 프로젝트만 삭제 가능합니다.")
+
+    # 업로드된 영상 파일 정리 (재분석 위해 보존하던 파일들)
+    jobs = db.query(Job).filter(Job.project_id == project_id).all()
+    for j in jobs:
+        try:
+            f = settings.upload_dir / f"job_{j.id}_{j.video_filename}"
+            if f.exists():
+                f.unlink()
+        except Exception:
+            pass
+
     db.delete(project)
     db.commit()
 
