@@ -160,21 +160,29 @@ def rerun_job(
             detail="Gemini API 키가 등록되지 않았습니다. 프로필에서 먼저 키를 입력하세요.",
         )
 
-    # 가장 최근 완료/실패한 job 의 영상 파일을 재사용
-    last_job = (
+    # 가장 최근부터 거꾸로 훑어서 실제로 파일이 남아있는 job 을 찾는다
+    all_jobs = (
         db.query(Job)
         .filter(Job.project_id == project_id)
         .order_by(desc(Job.created_at))
-        .first()
+        .all()
     )
-    if not last_job:
+    if not all_jobs:
         raise HTTPException(
             status_code=400,
             detail="재분석할 영상이 없습니다. 먼저 영상을 업로드하세요.",
         )
 
-    src_path = settings.upload_dir / f"job_{last_job.id}_{last_job.video_filename}"
-    if not src_path.exists():
+    src_path: Path | None = None
+    last_job: Job | None = None
+    for j in all_jobs:
+        candidate = settings.upload_dir / f"job_{j.id}_{j.video_filename}"
+        if candidate.exists():
+            src_path = candidate
+            last_job = j
+            break
+
+    if src_path is None or last_job is None:
         raise HTTPException(
             status_code=400,
             detail="원본 영상 파일을 찾을 수 없습니다. 다시 업로드해주세요.",

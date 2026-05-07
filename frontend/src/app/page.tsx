@@ -59,7 +59,7 @@ export default function HomePage() {
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow p-6 mb-8">
+        <div className="bg-white rounded-2xl shadow p-6 mb-6">
           <h2 className="font-semibold mb-3">새 프로젝트 만들기</h2>
           <div className="flex gap-2">
             <input
@@ -76,6 +76,42 @@ export default function HomePage() {
             >
               만들기
             </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl shadow p-6 mb-8">
+          <h2 className="font-semibold mb-3">📖 컷 감지 민감도 가이드</h2>
+          <div className="border border-slate-200 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="text-left px-4 py-2 font-medium">영상 종류</th>
+                  <th className="text-left px-4 py-2 font-medium">추천 값</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                <tr>
+                  <td className="px-4 py-2">디졸브 많음 (광고, MV)</td>
+                  <td className="px-4 py-2 font-mono">22~25</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-2">일반 애니메이션</td>
+                  <td className="px-4 py-2 font-mono">27~30</td>
+                </tr>
+                <tr className="bg-amber-50">
+                  <td className="px-4 py-2">컷이 자주 잡힘 → 줄이기</td>
+                  <td className="px-4 py-2 font-mono">30~35 ⭐</td>
+                </tr>
+                <tr>
+                  <td className="px-4 py-2">액션, 흔들림 많음</td>
+                  <td className="px-4 py-2 font-mono">32~38</td>
+                </tr>
+              </tbody>
+            </table>
+            <p className="text-xs text-slate-500 px-4 py-2 bg-slate-50">
+              값이 <strong>낮을수록 민감</strong>(컷 많이 잡힘), <strong>높을수록 둔감</strong>(컷 적게 잡힘).
+              기본값 27부터 시작해 결과 보고 조절하세요. 영상 업로드 후 같은 영상으로 재분석도 가능합니다.
+            </p>
           </div>
         </div>
 
