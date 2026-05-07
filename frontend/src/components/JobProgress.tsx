@@ -1,8 +1,18 @@
 "use client";
 
 import type { Job } from "@/lib/api";
+import { useApi } from "@/lib/api";
 
-export function JobProgress({ job }: { job: Job | null }) {
+export function JobProgress({
+  job,
+  projectId,
+  onCancelled,
+}: {
+  job: Job | null;
+  projectId?: number;
+  onCancelled?: () => void;
+}) {
+  const api = useApi();
   if (!job) return null;
 
   const pct =
@@ -39,6 +49,20 @@ export function JobProgress({ job }: { job: Job | null }) {
       )}
       {job.error && (
         <div className="text-sm text-red-600 mt-2">에러: {job.error}</div>
+      )}
+      {(job.status === "pending" || job.status === "running") && projectId && (
+        <div className="mt-3">
+          <button
+            onClick={async () => {
+              if (!confirm("분석을 중단할까요?")) return;
+              await api.cancelJob(projectId, job.id);
+              onCancelled?.();
+            }}
+            className="bg-amber-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-700"
+          >
+            ⏹ 분석 중단
+          </button>
+        </div>
       )}
     </section>
   );

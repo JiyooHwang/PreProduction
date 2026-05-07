@@ -79,3 +79,33 @@ class ShotUpdate(BaseModel):
     dialogue: Optional[str] = None
     fx: Optional[str] = None
     notes: Optional[str] = None
+
+
+class ScenarioCreate(BaseModel):
+    title: str
+    source_text: str
+
+
+class ScenarioOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    title: str
+    status: str
+    error: Optional[str] = None
+    characters: Optional[list] = None
+    locations: Optional[list] = None
+    props: Optional[list] = None
+    fx: Optional[list] = None
+    shots: Optional[list] = None
+    dialogues: Optional[list] = None
+    created_at: datetime
+    finished_at: Optional[datetime] = None
+
+
+class ScenarioListItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    title: str
+    status: str
+    created_at: datetime
+    finished_at: Optional[datetime] = None

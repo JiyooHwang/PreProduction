@@ -97,3 +97,27 @@ class Shot(Base):
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     project: Mapped[Project] = relationship(back_populates="shots")
+
+
+class Scenario(Base):
+    """시나리오(대본) 분석 결과를 저장."""
+
+    __tablename__ = "scenarios"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    title: Mapped[str] = mapped_column(String(255))
+    source_text: Mapped[str] = mapped_column(Text)  # 원본 시나리오 텍스트
+    status: Mapped[str] = mapped_column(String(32), default=JobStatus.PENDING.value)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # 분석 결과 (Gemini 가 채움)
+    characters: Mapped[list | None] = mapped_column(JSON, nullable=True)  # [{name, description, notes}]
+    locations: Mapped[list | None] = mapped_column(JSON, nullable=True)   # [{name, time_of_day, description}]
+    props: Mapped[list | None] = mapped_column(JSON, nullable=True)       # [{name, description}]
+    fx: Mapped[list | None] = mapped_column(JSON, nullable=True)          # [{name, description}]
+    shots: Mapped[list | None] = mapped_column(JSON, nullable=True)       # [{shot_size, camera, action, ...}]
+    dialogues: Mapped[list | None] = mapped_column(JSON, nullable=True)   # [{character, line}]
+
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

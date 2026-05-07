@@ -148,6 +148,28 @@ async def create_job(
     return JobOut.model_validate(job)
 
 
+@router.post("/{project_id}/jobs/{job_id}/cancel", response_model=JobOut)
+def cancel_job(
+    project_id: int,
+    job_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> JobOut:
+    project = _get_project_or_404(project_id, db)
+    if project.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="본인 프로젝트만 중단할 수 있습니다.")
+    job = db.get(Job, job_id)
+    if not job or job.project_id != project_id:
+        raise HTTPException(status_code=404, detail="작업을 찾을 수 없습니다.")
+    if job.status not in (JobStatus.PENDING.value, JobStatus.RUNNING.value):
+        return JobOut.model_validate(job)
+    job.status = JobStatus.FAILED.value
+    job.error = "사용자가 분석을 중단했습니다."
+    db.commit()
+    db.refresh(job)
+    return JobOut.model_validate(job)
+
+
 @router.post(
     "/{project_id}/jobs/rerun",
     response_model=JobOut,

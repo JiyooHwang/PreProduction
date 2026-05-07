@@ -13,6 +13,12 @@ export function Header() {
         </Link>
         {data?.user && (
           <div className="flex items-center gap-3 text-sm">
+            <Link href="/" className="text-slate-600 hover:underline">
+              영상 분석
+            </Link>
+            <Link href="/scenarios" className="text-slate-600 hover:underline">
+              시나리오 분석
+            </Link>
             <Link href="/settings" className="text-slate-600 hover:underline">
               설정
             </Link>

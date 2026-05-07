@@ -163,7 +163,45 @@ export function useApi() {
     exportUrl: (projectId: number) => `${API_URL}/api/projects/${projectId}/export.xlsx`,
     thumbnailUrl: (projectId: number, shotIndex: number) =>
       `${API_URL}/api/projects/${projectId}/thumbnails/${shotIndex}`,
+
+    cancelJob: async (projectId: number, jobId: number) =>
+      request(token, `/api/projects/${projectId}/jobs/${jobId}/cancel`, { method: "POST" }),
+
+    scenarios: (config?: SWRConfiguration) =>
+      useSWR<ScenarioListItem[]>(token ? "/api/scenarios" : null, fetcher, config),
+    scenario: (id: number, config?: SWRConfiguration) =>
+      useSWR<ScenarioOut>(token && id ? `/api/scenarios/${id}` : null, fetcher, config),
+    createScenario: async (title: string, sourceText: string, file?: File) => {
+      const fd = new FormData();
+      fd.append("title", title);
+      fd.append("source_text", sourceText);
+      if (file) fd.append("file", file);
+      const res = await request(token, "/api/scenarios", { method: "POST", body: fd });
+      return res.json() as Promise<ScenarioOut>;
+    },
+    deleteScenario: async (id: number) =>
+      request(token, `/api/scenarios/${id}`, { method: "DELETE" }),
+    cancelScenario: async (id: number) =>
+      request(token, `/api/scenarios/${id}/cancel`, { method: "POST" }),
   };
+}
+
+export interface ScenarioListItem {
+  id: number;
+  title: string;
+  status: string;
+  created_at: string;
+  finished_at: string | null;
+}
+
+export interface ScenarioOut extends ScenarioListItem {
+  error: string | null;
+  characters: any[] | null;
+  locations: any[] | null;
+  props: any[] | null;
+  fx: any[] | null;
+  shots: any[] | null;
+  dialogues: any[] | null;
 }
 
 export async function authedFetch(token: string, path: string, init?: RequestInit) {

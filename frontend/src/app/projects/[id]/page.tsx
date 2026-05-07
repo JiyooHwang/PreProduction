@@ -72,7 +72,7 @@ export default function ProjectDetailPage() {
           hasExistingVideo={!!job}
         />
 
-        <JobProgress job={job ?? null} />
+        <JobProgress job={job ?? null} projectId={id} onCancelled={() => refreshJob()} />
 
         <ShotTable
           projectId={id}

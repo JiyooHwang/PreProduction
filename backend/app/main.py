@@ -10,7 +10,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import init_db
 from .jobs import start_workers
-from .routers import projects, shots, users
+from .scenario_jobs import start_scenario_workers
+from .routers import projects, scenarios, shots, users
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -22,6 +23,7 @@ async def lifespan(app: FastAPI):
     settings.storage_dir.mkdir(parents=True, exist_ok=True)
     settings.upload_dir.mkdir(parents=True, exist_ok=True)
     start_workers()
+    start_scenario_workers()
     yield
 
 
@@ -37,6 +39,7 @@ app.add_middleware(
 
 app.include_router(users.router)
 app.include_router(projects.router)
+app.include_router(scenarios.router)
 app.include_router(shots.router)
 
 

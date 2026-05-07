@@ -89,6 +89,10 @@ def _run_job(job_id: int) -> None:
             vision = build_provider("gemini", api_key=owner.gemini_api_key)
 
         def on_progress(done: int, total: int, msg: str) -> None:
+            db.refresh(job)
+            if job.status == JobStatus.FAILED.value and (job.error or "").startswith("사용자"):
+                # 사용자가 중단 요청
+                raise RuntimeError("사용자가 분석을 중단했습니다.")
             job.progress_done = done
             job.progress_total = total
             job.progress_message = msg
