@@ -1,4 +1,4 @@
-"""Imagen 으로 샷 이미지 생성."""
+"""Imagen / Gemini 로 샷 이미지 생성."""
 from __future__ import annotations
 
 import os
@@ -48,30 +48,85 @@ def generate_image(
     api_key: Optional[str] = None,
     model: Optional[str] = None,
 ) -> Path:
-    """Imagen 으로 이미지 생성. 실패 시 예외."""
+    """이미지 생성. Imagen 실패 시 Gemini image generation 으로 폴백."""
     from google import genai
-    from google.genai import types
 
     key = api_key or os.environ.get("GEMINI_API_KEY")
     if not key:
         raise RuntimeError("GEMINI_API_KEY 가 설정되지 않았습니다.")
 
     client = genai.Client(api_key=key)
-    model_name = model or os.environ.get("IMAGEN_MODEL", "imagen-3.0-generate-002")
 
-    response = client.models.generate_images(
-        model=model_name,
-        prompt=prompt,
-        config=types.GenerateImagesConfig(
-            number_of_images=1,
-            aspect_ratio="16:9",
+    # 명시 모델이 있으면 그걸로만 시도
+    if model:
+        return _try_generate(client, model, prompt, output_path)
+
+    # 기본 우선순위: env 의 IMAGEN_MODEL → 폴백 후보들
+    primary = os.environ.get("IMAGEN_MODEL")
+    candidates = []
+    if primary:
+        candidates.append(primary)
+    # Gemini Developer API 키로 동작 가능한 후보들
+    candidates.extend([
+        "gemini-2.5-flash-image",
+        "gemini-2.0-flash-preview-image-generation",
+        "imagen-3.0-generate-002",
+        "imagen-3.0-fast-generate-001",
+    ])
+
+    last_error: Optional[Exception] = None
+    seen: set = set()
+    for m in candidates:
+        if m in seen:
+            continue
+        seen.add(m)
+        try:
+            return _try_generate(client, m, prompt, output_path)
+        except Exception as e:
+            last_error = e
+            continue
+
+    raise last_error or RuntimeError("모든 이미지 생성 모델 호출 실패")
+
+
+def _try_generate(client, model: str, prompt: str, output_path: Path) -> Path:
+    """모델 종류에 따라 적절한 API 호출."""
+    from google.genai import types
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    if model.startswith("imagen"):
+        response = client.models.generate_images(
+            model=model,
+            prompt=prompt,
+            config=types.GenerateImagesConfig(
+                number_of_images=1,
+                aspect_ratio="16:9",
+            ),
+        )
+        if not response.generated_images:
+            raise RuntimeError(f"{model}: 이미지 결과 비어있음")
+        img_bytes = response.generated_images[0].image.image_bytes
+        output_path.write_bytes(img_bytes)
+        return output_path
+
+    # Gemini 계열 (gemini-2.x-flash-image 등)
+    response = client.models.generate_content(
+        model=model,
+        contents=[prompt],
+        config=types.GenerateContentConfig(
+            response_modalities=["IMAGE", "TEXT"],
         ),
     )
+    # 응답에서 inline_data(image/png) 추출
+    for cand in (response.candidates or []):
+        content = cand.content
+        if not content or not content.parts:
+            continue
+        for part in content.parts:
+            inline = getattr(part, "inline_data", None)
+            if inline and getattr(inline, "data", None):
+                output_path.write_bytes(inline.data)
+                return output_path
+    raise RuntimeError(f"{model}: inline image data 가 응답에 없음")
 
-    if not response.generated_images:
-        raise RuntimeError("이미지 생성 결과가 비어있습니다.")
-
-    img_bytes = response.generated_images[0].image.image_bytes
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_bytes(img_bytes)
-    return output_path

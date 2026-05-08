@@ -105,6 +105,7 @@ def _run_storyboard(scenario_id: int) -> None:
         sc.storyboard_error = None
         db.commit()
 
+        first_error: str | None = None
         for i, shot in enumerate(shots):
             # 사용자가 중간에 취소했는지 확인
             db.refresh(sc)
@@ -115,17 +116,32 @@ def _run_storyboard(scenario_id: int) -> None:
                 prompt = build_prompt(shot)
                 target = out_dir / f"shot_{i:04d}.png"  # type: ignore[operator]
                 generate_image(prompt, target, api_key=user.gemini_api_key)
+                logger.info("시나리오 %s 샷 %s 이미지 생성 OK", scenario_id, i)
             except Exception as e:
-                logger.warning("샷 %s 이미지 생성 실패: %s", i, e)
-                # 실패해도 계속 진행
+                logger.warning("시나리오 %s 샷 %s 이미지 생성 실패: %s", scenario_id, i, e)
+                if first_error is None:
+                    first_error = str(e)[:300]
 
             sc.storyboard_progress_done = i + 1
             db.commit()
 
-            # rate limit 회피용 짧은 sleep (Imagen 분당 한도 고려)
+            # rate limit 회피용 짧은 sleep
             time.sleep(1.0)
 
+        # 한 장도 생성 못했으면 에러 메시지 노출
+        from pathlib import Path as _P
+        any_image = any(
+            (_P(str(out_dir)) / f"shot_{i:04d}.png").exists() for i in range(len(shots))
+        )
+        if not any_image and first_error:
+            sc.storyboard_status = JobStatus.FAILED.value
+            sc.storyboard_error = f"이미지 생성 실패. 첫 에러: {first_error}"
+            db.commit()
+            return
+
         sc.storyboard_status = JobStatus.DONE.value
+        if first_error and not any_image:
+            sc.storyboard_error = first_error
         db.commit()
 
     except Exception as e:
