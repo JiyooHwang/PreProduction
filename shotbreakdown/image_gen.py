@@ -70,8 +70,8 @@ def generate_image(
     # 1) Gemini native image generation (response_modalities=IMAGE)
     # 2) Imagen (대부분 Vertex AI 전용이라 Developer key 로는 404)
     candidates.extend([
-        "gemini-2.5-flash-image-preview",
         "gemini-2.5-flash-image",
+        "gemini-2.5-flash-image-preview",
         "gemini-2.0-flash-preview-image-generation",
         "gemini-2.0-flash-exp-image-generation",
         "gemini-2.0-flash-exp",
@@ -117,9 +117,15 @@ def _try_generate(client, model: str, prompt: str, output_path: Path) -> Path:
         return output_path
 
     # Gemini 계열 (gemini-2.x-flash-image 등)
+    contents = [
+        types.Content(
+            role="user",
+            parts=[types.Part.from_text(text=prompt)],
+        ),
+    ]
     response = client.models.generate_content(
         model=model,
-        contents=[prompt],
+        contents=contents,
         config=types.GenerateContentConfig(
             response_modalities=["IMAGE", "TEXT"],
         ),
