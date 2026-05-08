@@ -19,7 +19,8 @@ echo.
 
 echo [1/3] Pulling latest code from GitHub...
 echo ------------------------------------------------
-git pull origin main
+rem 현재 체크아웃된 브랜치 그대로 pull (브랜치별 개발 지원)
+git pull
 if errorlevel 1 (
     echo.
     echo [WARN] git pull failed. Using existing code.

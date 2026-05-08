@@ -9,6 +9,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
+# TensorFlow + ffmpeg-python (TransNetV2 추론용)
+# 무거우니 코드 복사보다 먼저 설치해서 layer 캐시 활용
+RUN pip install --no-cache-dir tensorflow ffmpeg-python
+
 # shotbreakdown 코어 라이브러리 먼저 설치
 COPY shotbreakdown ./shotbreakdown
 COPY pyproject.toml ./pyproject.toml

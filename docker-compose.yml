@@ -35,9 +35,16 @@ services:
       MIN_SCENE_LEN_FRAMES: ${MIN_SCENE_LEN_FRAMES:-12}
       ADAPTIVE_THRESHOLD: ${ADAPTIVE_THRESHOLD:-3.0}
       DELETE_VIDEO_AFTER_PROCESSING: ${DELETE_VIDEO_AFTER_PROCESSING:-false}
+      # 컷 디텍터 선택: scenedetect (기본) | transnet (TransNetV2)
+      DETECTOR: ${DETECTOR:-scenedetect}
+      TRANSNET_PATH: /app/transnetv2
+      TRANSNET_THRESHOLD: ${TRANSNET_THRESHOLD:-0.5}
     volumes:
       - storage:/app/storage
       - uploads:/app/uploads
+      # TransNetV2 레포 마운트 (호스트의 ../TransNetV2 → 컨테이너의 /app/transnetv2)
+      # DETECTOR=transnet 일 때만 사용. 폴더 없어도 빌드는 됨.
+      - ../TransNetV2:/app/transnetv2:ro
     depends_on:
       postgres:
         condition: service_healthy
