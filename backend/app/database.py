@@ -35,3 +35,24 @@ def init_db() -> None:
     from . import models  # noqa: F401  ORM import side-effect
 
     Base.metadata.create_all(bind=engine)
+    _apply_lightweight_migrations()
+
+
+def _apply_lightweight_migrations() -> None:
+    """기존 DB 에 새 컬럼 추가 (idempotent). alembic 도입 전 임시 처리."""
+    from sqlalchemy import text
+
+    statements = [
+        # 시나리오 스토리보드 관련
+        "ALTER TABLE scenarios ADD COLUMN IF NOT EXISTS storyboard_status VARCHAR(32)",
+        "ALTER TABLE scenarios ADD COLUMN IF NOT EXISTS storyboard_progress_done INTEGER DEFAULT 0",
+        "ALTER TABLE scenarios ADD COLUMN IF NOT EXISTS storyboard_progress_total INTEGER DEFAULT 0",
+        "ALTER TABLE scenarios ADD COLUMN IF NOT EXISTS storyboard_error TEXT",
+    ]
+    with engine.begin() as conn:
+        for stmt in statements:
+            try:
+                conn.execute(text(stmt))
+            except Exception:
+                # 테이블이 아직 없거나 이미 컬럼이 있는 경우 무시
+                pass
