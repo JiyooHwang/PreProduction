@@ -211,6 +211,10 @@ export interface ScenarioOut extends ScenarioListItem {
   fx: any[] | null;
   shots: any[] | null;
   dialogues: any[] | null;
+  storyboard_status: string | null;
+  storyboard_progress_done: number;
+  storyboard_progress_total: number;
+  storyboard_error: string | null;
 }
 
 export async function authedFetch(token: string, path: string, init?: RequestInit) {
