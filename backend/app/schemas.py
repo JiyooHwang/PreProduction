@@ -98,6 +98,10 @@ class ScenarioOut(BaseModel):
     fx: Optional[list] = None
     shots: Optional[list] = None
     dialogues: Optional[list] = None
+    storyboard_status: Optional[str] = None
+    storyboard_progress_done: int = 0
+    storyboard_progress_total: int = 0
+    storyboard_error: Optional[str] = None
     created_at: datetime
     finished_at: Optional[datetime] = None
 

@@ -1,18 +1,24 @@
 """시나리오(대본) 분석 라우터."""
 from __future__ import annotations
 
+import io
 from datetime import datetime
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
+from shotbreakdown.scenario_export import export_scenario_excel
+
 from ..auth import get_current_user
+from ..config import settings
 from ..database import get_db
 from ..models import JobStatus, Scenario, User
 from ..schemas import ScenarioCreate, ScenarioListItem, ScenarioOut
-from ..scenario_jobs import enqueue_scenario
+from ..scenario_jobs import enqueue_scenario, enqueue_storyboard, storyboard_dir
 
 
 router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
@@ -120,3 +126,96 @@ def cancel_scenario(
     db.commit()
     db.refresh(sc)
     return ScenarioOut.model_validate(sc)
+
+
+@router.post("/{scenario_id}/storyboard", response_model=ScenarioOut)
+def start_storyboard(
+    scenario_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ScenarioOut:
+    sc = db.get(Scenario, scenario_id)
+    if not sc or sc.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="시나리오를 찾을 수 없습니다.")
+    if sc.status != JobStatus.DONE.value:
+        raise HTTPException(status_code=400, detail="먼저 시나리오 분석을 완료해주세요.")
+    if not sc.shots:
+        raise HTTPException(status_code=400, detail="분석된 샷이 없습니다.")
+    if sc.storyboard_status == JobStatus.RUNNING.value:
+        return ScenarioOut.model_validate(sc)
+
+    sc.storyboard_status = JobStatus.PENDING.value
+    sc.storyboard_progress_done = 0
+    sc.storyboard_progress_total = len(sc.shots)
+    sc.storyboard_error = None
+    db.commit()
+
+    enqueue_storyboard(scenario_id)
+    db.refresh(sc)
+    return ScenarioOut.model_validate(sc)
+
+
+@router.post("/{scenario_id}/storyboard/cancel", response_model=ScenarioOut)
+def cancel_storyboard(
+    scenario_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ScenarioOut:
+    sc = db.get(Scenario, scenario_id)
+    if not sc or sc.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="시나리오를 찾을 수 없습니다.")
+    if sc.storyboard_status not in (JobStatus.PENDING.value, JobStatus.RUNNING.value):
+        return ScenarioOut.model_validate(sc)
+    sc.storyboard_status = JobStatus.FAILED.value
+    sc.storyboard_error = "사용자가 스토리보드 생성을 중단했습니다."
+    db.commit()
+    db.refresh(sc)
+    return ScenarioOut.model_validate(sc)
+
+
+@router.get("/{scenario_id}/storyboard/{shot_index}")
+def get_storyboard_image(
+    scenario_id: int,
+    shot_index: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    sc = db.get(Scenario, scenario_id)
+    if not sc or sc.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="시나리오를 찾을 수 없습니다.")
+    img = Path(str(storyboard_dir(scenario_id))) / f"shot_{shot_index:04d}.png"
+    if not img.exists():
+        raise HTTPException(status_code=404, detail="이미지 없음")
+    return FileResponse(str(img), media_type="image/png")
+
+
+@router.get("/{scenario_id}/export.xlsx")
+def export_scenario(
+    scenario_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    sc = db.get(Scenario, scenario_id)
+    if not sc or sc.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="시나리오를 찾을 수 없습니다.")
+    if sc.status != JobStatus.DONE.value:
+        raise HTTPException(status_code=400, detail="분석이 완료된 시나리오만 다운로드할 수 있습니다.")
+
+    out = settings.storage_dir / f"scenario_{scenario_id}" / "scenario.xlsx"
+    sb_dir = Path(str(storyboard_dir(scenario_id)))
+    export_scenario_excel(
+        title=sc.title,
+        characters=sc.characters or [],
+        locations=sc.locations or [],
+        props=sc.props or [],
+        fx=sc.fx or [],
+        shots=sc.shots or [],
+        dialogues=sc.dialogues or [],
+        storyboard_dir=sb_dir if sb_dir.exists() else None,
+        output_path=out,
+    )
+    return FileResponse(
+        str(out),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        filename=f"{sc.title}.xlsx",
+    )

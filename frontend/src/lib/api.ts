@@ -183,6 +183,15 @@ export function useApi() {
       request(token, `/api/scenarios/${id}`, { method: "DELETE" }),
     cancelScenario: async (id: number) =>
       request(token, `/api/scenarios/${id}/cancel`, { method: "POST" }),
+    startStoryboard: async (id: number) => {
+      const res = await request(token, `/api/scenarios/${id}/storyboard`, { method: "POST" });
+      return res.json() as Promise<ScenarioOut>;
+    },
+    cancelStoryboard: async (id: number) =>
+      request(token, `/api/scenarios/${id}/storyboard/cancel`, { method: "POST" }),
+    storyboardImageUrl: (id: number, shotIndex: number) =>
+      `${API_URL}/api/scenarios/${id}/storyboard/${shotIndex}`,
+    scenarioExportUrl: (id: number) => `${API_URL}/api/scenarios/${id}/export.xlsx`,
   };
 }
 

@@ -119,5 +119,11 @@ class Scenario(Base):
     shots: Mapped[list | None] = mapped_column(JSON, nullable=True)       # [{shot_size, camera, action, ...}]
     dialogues: Mapped[list | None] = mapped_column(JSON, nullable=True)   # [{character, line}]
 
+    # 스토리보드 이미지 생성 상태
+    storyboard_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    storyboard_progress_done: Mapped[int] = mapped_column(Integer, default=0)
+    storyboard_progress_total: Mapped[int] = mapped_column(Integer, default=0)
+    storyboard_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
