@@ -66,15 +66,20 @@ def generate_image(
     candidates = []
     if primary:
         candidates.append(primary)
-    # Gemini Developer API 키로 동작 가능한 후보들
+    # Gemini Developer API 키로 동작 가능한 후보들 (2024~2026 기준)
+    # 1) Gemini native image generation (response_modalities=IMAGE)
+    # 2) Imagen (대부분 Vertex AI 전용이라 Developer key 로는 404)
     candidates.extend([
+        "gemini-2.5-flash-image-preview",
         "gemini-2.5-flash-image",
         "gemini-2.0-flash-preview-image-generation",
+        "gemini-2.0-flash-exp-image-generation",
+        "gemini-2.0-flash-exp",
         "imagen-3.0-generate-002",
         "imagen-3.0-fast-generate-001",
     ])
 
-    last_error: Optional[Exception] = None
+    errors: list[str] = []
     seen: set = set()
     for m in candidates:
         if m in seen:
@@ -83,10 +88,11 @@ def generate_image(
         try:
             return _try_generate(client, m, prompt, output_path)
         except Exception as e:
-            last_error = e
+            errors.append(f"{m}: {str(e)[:120]}")
             continue
 
-    raise last_error or RuntimeError("모든 이미지 생성 모델 호출 실패")
+    msg = "모든 이미지 생성 모델 호출 실패. 시도 내역:\n" + "\n".join(errors)
+    raise RuntimeError(msg)
 
 
 def _try_generate(client, model: str, prompt: str, output_path: Path) -> Path:
