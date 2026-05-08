@@ -21,6 +21,20 @@ def _get_request_interval() -> float:
         return 5.0
 
 
+def _run_detection(video_path: Path, threshold: float):
+    """DETECTOR 환경변수로 디텍터 선택. 기본은 PySceneDetect."""
+    detector = os.environ.get("DETECTOR", "scenedetect").lower()
+    if detector == "transnet":
+        from .detect_transnet import detect_shots_transnet
+
+        try:
+            t = float(os.environ.get("TRANSNET_THRESHOLD", "0.5"))
+        except ValueError:
+            t = 0.5
+        return detect_shots_transnet(video_path, threshold=t)
+    return detect_shots(video_path, threshold=threshold)
+
+
 ProgressCb = Callable[[int, int, str], None]
 
 
@@ -36,7 +50,7 @@ def build_shot_list(
 
     if on_progress:
         on_progress(0, 1, "컷 감지 중...")
-    scenes = detect_shots(video_path, threshold=threshold)
+    scenes = _run_detection(video_path, threshold=threshold)
     if not scenes:
         return []
 
