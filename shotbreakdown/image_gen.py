@@ -2,8 +2,12 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Optional
+
+
+_RATE_LIMIT_BACKOFFS = (8, 20, 40)  # 초 단위; 합계 ~68초
 
 
 IMAGE_PROMPT_TEMPLATE = """Create a storyboard sketch for an animation scene.
@@ -71,7 +75,6 @@ def generate_image(
     # 2) Imagen (대부분 Vertex AI 전용이라 Developer key 로는 404)
     candidates.extend([
         "gemini-2.5-flash-image",
-        "gemini-2.5-flash-image-preview",
         "gemini-2.0-flash-preview-image-generation",
         "gemini-2.0-flash-exp-image-generation",
         "gemini-2.0-flash-exp",
@@ -86,13 +89,35 @@ def generate_image(
             continue
         seen.add(m)
         try:
-            return _try_generate(client, m, prompt, output_path)
+            return _try_generate_with_backoff(client, m, prompt, output_path)
         except Exception as e:
-            errors.append(f"{m}: {str(e)[:120]}")
+            errors.append(f"{m}: {str(e)[:160]}")
             continue
 
     msg = "모든 이미지 생성 모델 호출 실패. 시도 내역:\n" + "\n".join(errors)
     raise RuntimeError(msg)
+
+
+def _is_rate_limit_error(err: Exception) -> bool:
+    s = str(err)
+    return "429" in s or "RESOURCE_EXHAUSTED" in s or "rate limit" in s.lower()
+
+
+def _try_generate_with_backoff(client, model: str, prompt: str, output_path: Path) -> Path:
+    """429 만나면 지수 백오프 후 재시도. 다른 에러는 즉시 전파."""
+    last_err: Optional[Exception] = None
+    for attempt, wait in enumerate((0,) + _RATE_LIMIT_BACKOFFS):
+        if wait:
+            time.sleep(wait)
+        try:
+            return _try_generate(client, model, prompt, output_path)
+        except Exception as e:
+            last_err = e
+            if not _is_rate_limit_error(e):
+                raise
+            # 마지막 시도면 루프 탈출 후 raise
+    assert last_err is not None
+    raise last_err
 
 
 def _try_generate(client, model: str, prompt: str, output_path: Path) -> Path:
