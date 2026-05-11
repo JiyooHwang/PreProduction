@@ -622,6 +622,7 @@ function RegenerateModal({
   onDone: () => void;
 }) {
   const api = useApi();
+  const { data: characters } = api.characters({ refreshInterval: 0 });
   const [prompt, setPrompt] = useState<string>("");
   const [shotSize, setShotSize] = useState<string>(shot?.shot_size || "MS");
   const [camera, setCamera] = useState<string>(shot?.camera_movement || "FIX");
@@ -631,14 +632,20 @@ function RegenerateModal({
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // 사용자가 텍스트박스를 직접 수정했으면 자동 갱신 멈춤
+  const [promptManuallyEdited, setPromptManuallyEdited] = useState(false);
 
+  // 모달 처음 열릴 때 백엔드 기본 프롬프트 1회만 가져옴
   useEffect(() => {
     let aborted = false;
     setLoading(true);
     api
       .getShotPrompt(scenarioId, shotIndex)
       .then((r) => {
-        if (!aborted) setPrompt(r.prompt);
+        if (!aborted) {
+          setPrompt(r.prompt);
+          setPromptManuallyEdited(false);
+        }
       })
       .catch((e) => {
         if (!aborted) setErr(String(e?.message || e));
@@ -668,7 +675,33 @@ function RegenerateModal({
       );
     }
     setPrompt(p);
+    setPromptManuallyEdited(false);
   };
+
+  // 구조화 필드가 바뀌면 자동으로 프롬프트 갱신 (사용자가 직접 편집했으면 멈춤)
+  useEffect(() => {
+    if (loading) return;
+    if (promptManuallyEdited) return;
+    rebuildPrompt();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shotSize, camera, action, extraDirection, loading]);
+
+  // 이 샷에 등장하는 캐릭터들의 라이브러리 매칭 상태 계산
+  const shotChars: string[] = Array.isArray(shot?.characters)
+    ? shot.characters
+    : shot?.characters
+      ? [String(shot.characters)]
+      : [];
+  const charMatches = shotChars.map((name) => {
+    const found = (characters || []).find(
+      (c) => c.name.toLowerCase() === String(name).trim().toLowerCase(),
+    );
+    return {
+      name: String(name),
+      registered: !!found,
+      hasDescription: !!(found && found.description && found.description.trim()),
+    };
+  });
 
   const handleRegen = async (useCustom: boolean) => {
     setErr(null);
@@ -692,10 +725,53 @@ function RegenerateModal({
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="font-semibold text-lg mb-1">샷 #{shotIndex + 1} 재생성</h3>
-        <div className="text-sm text-slate-500 mb-4">
+        <div className="text-sm text-slate-500 mb-3">
           카메라 앵글이나 샷 사이즈를 바꿔서 같은 장면을 다른 시점으로 그려보세요.
-          캐릭터 라이브러리에 등록된 캐릭터는 자동으로 참조 이미지로 사용됩니다.
+          구조화된 입력을 바꾸면 아래 프롬프트가 자동으로 갱신됩니다.
         </div>
+
+        {/* 캐릭터 라이브러리 매칭 상태 */}
+        {shotChars.length > 0 && (
+          <div className="mb-3 p-3 rounded-lg bg-slate-50 border border-slate-200 text-xs">
+            <div className="font-semibold text-slate-700 mb-1.5">
+              이 샷의 캐릭터 라이브러리 매칭
+            </div>
+            <div className="space-y-1">
+              {charMatches.map((m) => (
+                <div key={m.name} className="flex items-center gap-2">
+                  {m.registered && m.hasDescription ? (
+                    <span className="text-green-700">✓</span>
+                  ) : m.registered ? (
+                    <span className="text-amber-600">!</span>
+                  ) : (
+                    <span className="text-red-500">✗</span>
+                  )}
+                  <span className="font-medium text-slate-700">{m.name}</span>
+                  <span className="text-slate-500">—</span>
+                  {m.registered && m.hasDescription ? (
+                    <span className="text-green-700">
+                      라이브러리 등록됨 + 외형 설명 있음 (외형 자동 유지)
+                    </span>
+                  ) : m.registered ? (
+                    <span className="text-amber-700">
+                      등록은 됐지만 외형 설명이 비어있음 — 카메라 바꾸면 외형이 매번 다를 수 있음.{" "}
+                      <a href="/characters" className="underline">
+                        라이브러리 가서 설명 채우기
+                      </a>
+                    </span>
+                  ) : (
+                    <span className="text-red-600">
+                      라이브러리에 미등록 — 외형 일관성 보장 안 됨.{" "}
+                      <a href="/characters" className="underline">
+                        등록하기
+                      </a>
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {loading ? (
           <div className="text-sm text-slate-500">프롬프트 불러오는 중...</div>
@@ -799,12 +875,22 @@ function RegenerateModal({
                 />
               </div>
 
-              <button
-                onClick={rebuildPrompt}
-                className="text-sm bg-slate-900 text-white px-3 py-1.5 rounded hover:bg-slate-700"
-              >
-                📝 이 값으로 프롬프트 새로 만들기
-              </button>
+              <div className="text-xs text-slate-500 italic">
+                위 값을 바꾸면 아래 프롬프트가 자동으로 갱신됩니다.
+                {promptManuallyEdited && (
+                  <span className="text-amber-700 ml-2">
+                    (지금은 수동 편집 상태 — 자동 갱신 멈춤)
+                  </span>
+                )}
+              </div>
+              {promptManuallyEdited && (
+                <button
+                  onClick={rebuildPrompt}
+                  className="text-xs bg-slate-900 text-white px-3 py-1 rounded hover:bg-slate-700 mt-2"
+                >
+                  📝 자동 갱신 다시 켜기 (위 값으로 프롬프트 재작성)
+                </button>
+              )}
             </div>
 
             {/* 최종 프롬프트 (직접 수정도 가능) */}
@@ -814,7 +900,10 @@ function RegenerateModal({
               </label>
               <textarea
                 value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
+                onChange={(e) => {
+                  setPrompt(e.target.value);
+                  setPromptManuallyEdited(true);
+                }}
                 rows={10}
                 className="w-full border border-slate-300 rounded-lg p-3 text-sm font-mono"
               />
