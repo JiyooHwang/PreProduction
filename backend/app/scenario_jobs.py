@@ -112,6 +112,39 @@ def resolve_character_references(
     return out
 
 
+def resolve_character_descriptions(
+    db: Session,
+    owner_id: int,
+    character_names: list[str],
+) -> list[dict]:
+    """라이브러리 매칭 캐릭터의 외형 묘사 텍스트만 반환 (이미지 없음, 구도 영향 없음).
+
+    카메라 앵글 바꿀 때도 외형 일관성을 텍스트로 유지하는 용도.
+    반환: [{name, description}, ...]
+    """
+    if not character_names:
+        return []
+    names = [n for n in character_names if isinstance(n, str) and n.strip()]
+    if not names:
+        return []
+    rows = (
+        db.query(CharacterDesign)
+        .filter(CharacterDesign.owner_id == owner_id)
+        .all()
+    )
+    by_name_lower = {r.name.lower(): r for r in rows}
+    out: list[dict] = []
+    seen: set[int] = set()
+    for n in names:
+        cd = by_name_lower.get(n.lower())
+        if cd is None or cd.id in seen:
+            continue
+        seen.add(cd.id)
+        if cd.description and cd.description.strip():
+            out.append({"name": cd.name, "description": cd.description.strip()})
+    return out
+
+
 def _run_storyboard(scenario_id: int) -> None:
     import time
     db: Session = SessionLocal()
@@ -153,21 +186,23 @@ def _run_storyboard(scenario_id: int) -> None:
                 prompt = build_prompt(shot)
                 target = out_dir / f"shot_{i:04d}.png"  # type: ignore[operator]
 
-                # 이 샷에 등장하는 캐릭터의 라이브러리 이미지 매칭
+                # 이 샷에 등장하는 캐릭터의 라이브러리 이미지 + 외형 묘사 매칭
                 shot_chars = shot.get("characters") or []
                 if isinstance(shot_chars, str):
                     shot_chars = [shot_chars]
                 refs = resolve_character_references(db, user.id, shot_chars)
+                descs = resolve_character_descriptions(db, user.id, shot_chars)
 
                 generate_image(
                     prompt,
                     target,
                     api_key=user.gemini_api_key,
                     reference_images=refs,
+                    character_descriptions=descs,
                 )
                 logger.info(
-                    "시나리오 %s 샷 %s 이미지 생성 OK (refs=%d)",
-                    scenario_id, i, len(refs),
+                    "시나리오 %s 샷 %s 이미지 생성 OK (refs=%d, descs=%d)",
+                    scenario_id, i, len(refs), len(descs),
                 )
             except Exception as e:
                 logger.warning("시나리오 %s 샷 %s 이미지 생성 실패: %s", scenario_id, i, e)

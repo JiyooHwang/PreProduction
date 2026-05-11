@@ -109,14 +109,22 @@ export default function CharactersPage() {
                 />
               </div>
               <div>
-                <label className="block text-sm text-slate-600 mb-1">설명 (선택)</label>
-                <input
-                  type="text"
+                <label className="block text-sm text-slate-600 mb-1">
+                  외형 설명 ⭐ (꼭 채우면 카메라 변경 시 외형 일관성에 큰 도움)
+                </label>
+                <textarea
                   value={createDesc}
                   onChange={(e) => setCreateDesc(e.target.value)}
-                  placeholder="예: 20대 여성, 단발머리"
+                  placeholder={
+                    "예: young woman in her 20s, shoulder-length straight black hair with bangs, " +
+                    "large brown eyes, wearing a white blouse and beige cardigan, slim build"
+                  }
+                  rows={3}
                   className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"
                 />
+                <div className="text-xs text-slate-500 mt-1">
+                  헤어/의상/체형 등 일관되게 유지할 외형 특징을 영어로 적으세요.
+                </div>
               </div>
               <div>
                 <label className="block text-sm text-slate-600 mb-1">
@@ -237,6 +245,34 @@ function UsageGuide() {
                 <li>PNG/JPG, 5MB 이하</li>
                 <li>여러 각도가 합쳐진 캐릭터 시트도 OK</li>
               </ul>
+            </div>
+          </div>
+
+          <div>
+            <div className="font-semibold mb-1">
+              5. ⭐ <b>설명</b> 필드 잘 채우기 (외형 일관성의 핵심)
+            </div>
+            <div className="text-purple-800">
+              설명에 외형 특징을 <b>구체적이고 영어로</b> 적으면, 카메라 앵글이
+              바뀌거나 참조 이미지를 안 쓸 때도 모델이 캐릭터 외형을 유지하려고
+              합니다.
+              <div className="mt-2 bg-white border border-purple-200 rounded p-2 font-mono text-xs">
+                예) young woman in her 20s, shoulder-length straight black hair
+                with bangs, large brown eyes, wearing a white blouse and beige
+                cardigan, slim build
+              </div>
+              <div className="mt-2">포함하면 좋은 항목:</div>
+              <ul className="list-disc ml-5 space-y-0.5 mt-1">
+                <li>나이/성별/체형</li>
+                <li>헤어스타일 (길이/색/스타일)</li>
+                <li>눈/얼굴 특징</li>
+                <li>의상 (시나리오에서 일관되게 입을 옷)</li>
+                <li>고유 특징 (안경, 모자, 흉터, 문신 등)</li>
+              </ul>
+              <div className="mt-2 text-purple-700">
+                팁: 한국어로 적어도 동작하지만 <b>영어로 적으면 효과가 훨씬 강합니다</b>.
+                Gemini 가 영어 기반이라.
+              </div>
             </div>
           </div>
         </div>

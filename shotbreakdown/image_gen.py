@@ -115,11 +115,12 @@ def generate_image(
     api_key: Optional[str] = None,
     model: Optional[str] = None,
     reference_images: Optional[Sequence[ReferenceImage]] = None,
+    character_descriptions: Optional[Sequence[dict]] = None,
 ) -> Path:
     """이미지 생성. Imagen 실패 시 Gemini image generation 으로 폴백.
 
-    reference_images 가 제공되면 Gemini 멀티모달 입력으로 함께 전달돼
-    캐릭터 룩의 일관성을 유지한다 (Imagen 후보는 참조 미지원이라 스킵).
+    reference_images: 캐릭터 디자인 이미지. 외형 일관성에 강하지만 구도도 같이 끌고옴.
+    character_descriptions: [{name, description}] 형태. 텍스트로 외형 보강. 구도 영향 없음.
     """
     from google import genai
 
@@ -129,10 +130,14 @@ def generate_image(
 
     client = genai.Client(api_key=key)
     refs = list(reference_images or [])
+    char_descs = list(character_descriptions or [])
+
+    # 캐릭터 묘사가 있으면 프롬프트에 추가 (이미지 참조 없이도 외형 유지에 도움)
+    enriched_prompt = _enrich_prompt_with_characters(prompt, char_descs)
 
     # 명시 모델이 있으면 그걸로만 시도
     if model:
-        return _try_generate(client, model, prompt, output_path, refs)
+        return _try_generate(client, model, enriched_prompt, output_path, refs)
 
     # 기본 우선순위: env 의 IMAGEN_MODEL → 폴백 후보들
     primary = os.environ.get("IMAGEN_MODEL")
@@ -159,13 +164,40 @@ def generate_image(
             continue
         seen.add(m)
         try:
-            return _try_generate_with_backoff(client, m, prompt, output_path, refs)
+            return _try_generate_with_backoff(client, m, enriched_prompt, output_path, refs)
         except Exception as e:
             errors.append(f"{m}: {str(e)[:160]}")
             continue
 
     msg = "모든 이미지 생성 모델 호출 실패. 시도 내역:\n" + "\n".join(errors)
     raise RuntimeError(msg)
+
+
+def _enrich_prompt_with_characters(prompt: str, char_descs: list[dict]) -> str:
+    """캐릭터 외형 묘사를 프롬프트에 텍스트로 주입.
+
+    이미지 참조와 달리 구도/카메라에 영향을 주지 않으면서 외형 일관성에 기여한다.
+    """
+    if not char_descs:
+        return prompt
+    lines: list[str] = []
+    for cd in char_descs:
+        name = (cd.get("name") or "").strip()
+        desc = (cd.get("description") or "").strip()
+        if not name or not desc:
+            continue
+        lines.append(f"- {name}: {desc}")
+    if not lines:
+        return prompt
+
+    block = (
+        "\n\nCHARACTER APPEARANCE (must remain consistent across all shots):\n"
+        + "\n".join(lines)
+    )
+    # Style 라인 직전에 삽입 (있으면). 없으면 끝에.
+    if "\nStyle: " in prompt:
+        return prompt.replace("\nStyle: ", block + "\n\nStyle: ", 1)
+    return prompt + block
 
 
 def _is_rate_limit_error(err: Exception) -> bool:

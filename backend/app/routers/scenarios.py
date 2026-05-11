@@ -28,6 +28,7 @@ from ..schemas import (
 from ..scenario_jobs import (
     enqueue_scenario,
     enqueue_storyboard,
+    resolve_character_descriptions,
     resolve_character_references,
     storyboard_dir,
 )
@@ -223,12 +224,15 @@ def regenerate_storyboard_shot(
 
     prompt = (payload.prompt or "").strip() or build_prompt(shot)
 
-    # 이 샷에 등장하는 캐릭터들의 참조 이미지 로드
+    # 캐릭터 외형 묘사는 항상 텍스트로 주입 (구도 영향 없이 외형 일관성에 기여)
+    char_names = shot.get("characters") or []
+    if isinstance(char_names, str):
+        char_names = [char_names]
+    descriptions = resolve_character_descriptions(db, user.id, char_names)
+
+    # 참조 이미지는 토글 가능 (카메라 앵글 변경 시 끄는 게 효과적)
     references: list = []
     if payload.use_references:
-        char_names = shot.get("characters") or []
-        if isinstance(char_names, str):
-            char_names = [char_names]
         references = resolve_character_references(db, user.id, char_names)
 
     out_dir = Path(str(storyboard_dir(scenario_id)))
@@ -241,11 +245,18 @@ def regenerate_storyboard_shot(
             target,
             api_key=user.gemini_api_key,
             reference_images=references,
+            character_descriptions=descriptions,
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"이미지 생성 실패: {str(e)[:300]}")
 
-    return {"ok": True, "shot_index": shot_index, "prompt": prompt}
+    return {
+        "ok": True,
+        "shot_index": shot_index,
+        "prompt": prompt,
+        "used_references": len(references),
+        "used_descriptions": len(descriptions),
+    }
 
 
 @router.get("/{scenario_id}/storyboard/{shot_index}/prompt")
