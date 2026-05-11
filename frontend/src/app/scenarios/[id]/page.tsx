@@ -220,8 +220,14 @@ function StoryboardUsageHint() {
             <b>대소문자 무시, 정확히 일치</b>해야 매칭됩니다.
           </div>
           <div className="text-purple-700">
-            팁: 캐릭터 디자인이 잘 안 반영되면 재생성 시 프롬프트에 &quot;in the style of
+            팁 1: 캐릭터 디자인이 잘 안 반영되면 재생성 시 프롬프트에 &quot;in the style of
             the reference character design&quot; 등 한 줄을 추가해보세요.
+          </div>
+          <div className="text-purple-700">
+            <b>팁 2 (카메라 앵글 변경):</b> 캐릭터 참조 이미지가 카메라 시점도 같이 끌고 와서
+            앵글 변경이 약해질 수 있어요. 재생성 모달의{" "}
+            <b>&quot;캐릭터 참조 이미지 사용&quot;</b> 체크박스를 <b>끄면</b> 카메라가
+            확실히 바뀝니다 (외형은 프롬프트 텍스트로만 유지).
           </div>
         </div>
       )}
@@ -592,6 +598,7 @@ function RegenerateModal({
   const [camera, setCamera] = useState<string>(shot?.camera_movement || "FIX");
   const [action, setAction] = useState<string>(shot?.action || "");
   const [extraDirection, setExtraDirection] = useState<string>("");
+  const [useReferences, setUseReferences] = useState<boolean>(true);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -638,7 +645,12 @@ function RegenerateModal({
     setErr(null);
     setBusy(true);
     try {
-      await api.regenerateShot(scenarioId, shotIndex, useCustom ? prompt : undefined);
+      await api.regenerateShot(
+        scenarioId,
+        shotIndex,
+        useCustom ? prompt : undefined,
+        useReferences,
+      );
       onDone();
     } catch (e: any) {
       setErr(String(e?.message || e));
@@ -767,6 +779,28 @@ function RegenerateModal({
                 rows={10}
                 className="w-full border border-slate-300 rounded-lg p-3 text-sm font-mono"
               />
+            </div>
+
+            {/* 캐릭터 참조 토글 — 카메라 앵글 바꿀 때 끄는 게 효과 좋음 */}
+            <div className="mt-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useReferences}
+                  onChange={(e) => setUseReferences(e.target.checked)}
+                  className="mt-1"
+                />
+                <div className="text-sm">
+                  <div className="font-semibold text-amber-900">
+                    캐릭터 라이브러리 참조 이미지 사용
+                  </div>
+                  <div className="text-amber-800 text-xs mt-1">
+                    켜기: 외형 일관성 유지 (다만 참조 이미지의 구도가 영향을 미쳐 카메라 변경 효과 약해질 수 있음).
+                    <br />
+                    <b>카메라 앵글을 확실히 바꾸고 싶으면 끄세요</b> (외형은 프롬프트 텍스트로만 유지).
+                  </div>
+                </div>
+              </label>
             </div>
 
             {err && <div className="text-sm text-red-600 mt-2">{err}</div>}

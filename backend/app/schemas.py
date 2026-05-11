@@ -133,3 +133,6 @@ class CharacterDesignUpdate(BaseModel):
 class ShotRegenerateIn(BaseModel):
     """샷 재생성 요청. prompt 가 비어있으면 기본 프롬프트로 재생성."""
     prompt: Optional[str] = None
+    # 캐릭터 라이브러리 참조 이미지를 사용할지. 기본 True.
+    # 카메라 앵글을 바꾸고 싶을 때는 False 로 보내면 참조 영향 없이 시점 변경이 잘 됨.
+    use_references: bool = True

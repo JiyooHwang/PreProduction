@@ -226,20 +226,31 @@ def _try_generate(
     # Gemini 멀티모달: 참조 이미지를 먼저 넣고 그 다음 텍스트 프롬프트
     parts: list = []
     if refs:
-        # 어떤 이미지가 누구인지 살짝 라벨링
+        # 참조 이미지의 구도를 가져오지 말고 외형만 참조하도록 명확히 지시
         labels = [r.label for r in refs if r.label]
-        if labels:
-            parts.append(
-                types.Part.from_text(
-                    text=(
-                        "Use the following character design references to keep visual consistency. "
-                        f"Characters: {', '.join(labels)}."
-                    )
+        names = ", ".join(labels) if labels else "the characters shown below"
+        parts.append(
+            types.Part.from_text(
+                text=(
+                    f"The following reference images show the visual appearance "
+                    f"and character design of {names}. "
+                    "Use these ONLY for character appearance (face, hair, costume, body type). "
+                    "DO NOT copy the pose, framing, camera angle, or composition from these "
+                    "reference images. The new image must follow the camera direction described "
+                    "in the prompt below, even if it differs completely from the references."
                 )
             )
+        )
         for r in refs:
             parts.append(types.Part.from_bytes(data=r.data, mime_type=r.mime_type))
-    parts.append(types.Part.from_text(text=prompt))
+
+    # 카메라 강조 보강
+    emphasized = prompt + (
+        "\n\nIMPORTANT: Render this scene using the CAMERA direction specified above. "
+        "The camera angle and framing must match the CAMERA description exactly, "
+        "regardless of any reference image composition."
+    )
+    parts.append(types.Part.from_text(text=emphasized))
 
     contents = [types.Content(role="user", parts=parts)]
     response = client.models.generate_content(

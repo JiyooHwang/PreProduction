@@ -224,10 +224,12 @@ def regenerate_storyboard_shot(
     prompt = (payload.prompt or "").strip() or build_prompt(shot)
 
     # 이 샷에 등장하는 캐릭터들의 참조 이미지 로드
-    char_names = shot.get("characters") or []
-    if isinstance(char_names, str):
-        char_names = [char_names]
-    references = resolve_character_references(db, user.id, char_names)
+    references: list = []
+    if payload.use_references:
+        char_names = shot.get("characters") or []
+        if isinstance(char_names, str):
+            char_names = [char_names]
+        references = resolve_character_references(db, user.id, char_names)
 
     out_dir = Path(str(storyboard_dir(scenario_id)))
     out_dir.mkdir(parents=True, exist_ok=True)

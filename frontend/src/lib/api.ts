@@ -202,6 +202,7 @@ export function useApi() {
       scenarioId: number,
       shotIndex: number,
       customPrompt?: string,
+      useReferences: boolean = true,
     ) => {
       const res = await request(
         token,
@@ -209,7 +210,10 @@ export function useApi() {
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ prompt: customPrompt || null }),
+          body: JSON.stringify({
+            prompt: customPrompt || null,
+            use_references: useReferences,
+          }),
         },
       );
       return res.json() as Promise<{ ok: boolean; shot_index: number; prompt: string }>;
