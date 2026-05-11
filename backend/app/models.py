@@ -127,3 +127,20 @@ class Scenario(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class CharacterDesign(Base):
+    """사용자 캐릭터 라이브러리. 모든 시나리오에서 재사용 가능한 캐릭터 참조 디자인."""
+
+    __tablename__ = "character_designs"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    owner_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(255), index=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_path: Mapped[str] = mapped_column(String(512))  # storage 상대 경로
+    image_mime: Mapped[str] = mapped_column(String(64), default="image/png")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )

@@ -173,6 +173,7 @@ export default function ScenarioDetailPage() {
               view={view}
               imageUrl={(idx) => api.storyboardImageUrl(id, idx)}
               storyboardReady={sc.storyboard_status === "done" || (sc.storyboard_progress_done ?? 0) > 0}
+              scenarioId={id}
             />
             <Section title="대사" items={sc.dialogues} keys={["scene_number", "character", "line"]} view={view} />
           </>
@@ -291,12 +292,28 @@ function ShotsSection({
   view,
   imageUrl,
   storyboardReady,
+  scenarioId,
 }: {
   items: any[] | null | undefined;
   view: ViewMode;
   imageUrl: (shotIndex: number) => string;
   storyboardReady: boolean;
+  scenarioId: number;
 }) {
+  const [regenIdx, setRegenIdx] = useState<number | null>(null);
+  // 샷 이미지 캐시 무효화용 (재생성 후 새 이미지 보여주려고)
+  const [bust, setBust] = useState<Record<number, number>>({});
+
+  const onRegenerated = (idx: number) => {
+    setBust((b) => ({ ...b, [idx]: Date.now() }));
+    setRegenIdx(null);
+  };
+
+  const imgSrcFor = (i: number) => {
+    const b = bust[i];
+    return b ? `${imageUrl(i)}?t=${b}` : imageUrl(i);
+  };
+
   if (!items || items.length === 0) {
     return (
       <div className="bg-white rounded-2xl shadow p-5 mb-6">
@@ -330,7 +347,16 @@ function ShotsSection({
                   <td className="px-3 py-2 align-top">{i + 1}</td>
                   <td className="px-3 py-2 align-top">
                     {storyboardReady ? (
-                      <ShotImage src={imageUrl(i)} />
+                      <div className="flex items-center gap-2">
+                        <ShotImage src={imgSrcFor(i)} />
+                        <button
+                          onClick={() => setRegenIdx(i)}
+                          className="text-xs text-purple-600 hover:underline whitespace-nowrap"
+                          title="이 샷 재생성"
+                        >
+                          🔄 재생성
+                        </button>
+                      </div>
                     ) : (
                       <span className="text-slate-300 text-xs">—</span>
                     )}
@@ -350,8 +376,14 @@ function ShotsSection({
           {items.map((it, i) => (
             <div key={i} className="border border-slate-200 rounded-lg overflow-hidden text-sm">
               {storyboardReady && (
-                <div className="bg-slate-100 aspect-video">
-                  <ShotImage src={imageUrl(i)} className="w-full h-full object-cover" />
+                <div className="bg-slate-100 aspect-video relative">
+                  <ShotImage src={imgSrcFor(i)} className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => setRegenIdx(i)}
+                    className="absolute bottom-2 right-2 bg-white/90 text-slate-700 text-xs px-2 py-1 rounded shadow hover:bg-white"
+                  >
+                    🔄 재생성
+                  </button>
                 </div>
               )}
               <div className="p-3">
@@ -371,6 +403,115 @@ function ShotsSection({
           ))}
         </div>
       )}
+
+      {regenIdx !== null && (
+        <RegenerateModal
+          scenarioId={scenarioId}
+          shotIndex={regenIdx}
+          onClose={() => setRegenIdx(null)}
+          onDone={() => onRegenerated(regenIdx)}
+        />
+      )}
+    </div>
+  );
+}
+
+function RegenerateModal({
+  scenarioId,
+  shotIndex,
+  onClose,
+  onDone,
+}: {
+  scenarioId: number;
+  shotIndex: number;
+  onClose: () => void;
+  onDone: () => void;
+}) {
+  const api = useApi();
+  const [prompt, setPrompt] = useState<string>("");
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let aborted = false;
+    setLoading(true);
+    api
+      .getShotPrompt(scenarioId, shotIndex)
+      .then((r) => {
+        if (!aborted) setPrompt(r.prompt);
+      })
+      .catch((e) => {
+        if (!aborted) setErr(String(e?.message || e));
+      })
+      .finally(() => {
+        if (!aborted) setLoading(false);
+      });
+    return () => {
+      aborted = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scenarioId, shotIndex]);
+
+  const handleRegen = async (useCustom: boolean) => {
+    setErr(null);
+    setBusy(true);
+    try {
+      await api.regenerateShot(scenarioId, shotIndex, useCustom ? prompt : undefined);
+      onDone();
+    } catch (e: any) {
+      setErr(String(e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6">
+        <h3 className="font-semibold text-lg mb-1">샷 #{shotIndex + 1} 재생성</h3>
+        <div className="text-sm text-slate-500 mb-4">
+          프롬프트를 수정하거나, 그대로 두고 기본 재생성하세요. 캐릭터 라이브러리에
+          등록된 캐릭터는 자동으로 참조 이미지로 사용됩니다.
+        </div>
+        {loading ? (
+          <div className="text-sm text-slate-500">프롬프트 불러오는 중...</div>
+        ) : (
+          <>
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              rows={10}
+              className="w-full border border-slate-300 rounded-lg p-3 text-sm font-mono"
+            />
+            {err && <div className="text-sm text-red-600 mt-2">{err}</div>}
+            <div className="flex gap-2 mt-4 justify-end">
+              <button
+                onClick={onClose}
+                disabled={busy}
+                className="bg-slate-100 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-200"
+              >
+                취소
+              </button>
+              <button
+                onClick={() => handleRegen(false)}
+                disabled={busy}
+                className="bg-slate-200 text-slate-800 px-4 py-2 rounded-lg hover:bg-slate-300"
+                title="원래 프롬프트로 재생성 (입력란 수정사항 무시)"
+              >
+                기본으로 재생성
+              </button>
+              <button
+                onClick={() => handleRegen(true)}
+                disabled={busy}
+                className="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 disabled:bg-slate-300"
+              >
+                {busy ? "생성 중..." : "이 프롬프트로 재생성"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 }

@@ -11,7 +11,7 @@ from .config import settings
 from .database import init_db
 from .jobs import start_workers
 from .scenario_jobs import start_scenario_workers
-from .routers import projects, scenarios, shots, users
+from .routers import characters, projects, scenarios, shots, users
 
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -38,6 +38,7 @@ app.add_middleware(
 )
 
 app.include_router(users.router)
+app.include_router(characters.router)
 app.include_router(projects.router)
 app.include_router(scenarios.router)
 app.include_router(shots.router)

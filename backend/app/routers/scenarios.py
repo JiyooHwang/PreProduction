@@ -11,14 +11,26 @@ from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy import desc
 from sqlalchemy.orm import Session
 
+from shotbreakdown.image_gen import build_prompt, generate_image
 from shotbreakdown.scenario_export import export_scenario_excel
 
 from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
-from ..models import JobStatus, Scenario, User
-from ..schemas import ScenarioCreate, ScenarioListItem, ScenarioOut
-from ..scenario_jobs import enqueue_scenario, enqueue_storyboard, storyboard_dir
+from ..models import CharacterDesign, JobStatus, Scenario, User
+from ..schemas import (
+    CharacterDesignOut,
+    ScenarioCreate,
+    ScenarioListItem,
+    ScenarioOut,
+    ShotRegenerateIn,
+)
+from ..scenario_jobs import (
+    enqueue_scenario,
+    enqueue_storyboard,
+    resolve_character_references,
+    storyboard_dir,
+)
 
 
 router = APIRouter(prefix="/api/scenarios", tags=["scenarios"])
@@ -187,6 +199,68 @@ def get_storyboard_image(
     if not img.exists():
         raise HTTPException(status_code=404, detail="이미지 없음")
     return FileResponse(str(img), media_type="image/png")
+
+
+@router.post("/{scenario_id}/storyboard/{shot_index}/regenerate")
+def regenerate_storyboard_shot(
+    scenario_id: int,
+    shot_index: int,
+    payload: ShotRegenerateIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """단일 샷 이미지 재생성. payload.prompt 가 있으면 그 프롬프트로, 없으면 기본 프롬프트로."""
+    sc = db.get(Scenario, scenario_id)
+    if not sc or sc.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="시나리오를 찾을 수 없습니다.")
+    if not user.gemini_api_key:
+        raise HTTPException(status_code=400, detail="Gemini API 키가 없습니다.")
+
+    shots = sc.shots or []
+    if shot_index < 0 or shot_index >= len(shots):
+        raise HTTPException(status_code=404, detail="샷 인덱스 범위 밖.")
+    shot = shots[shot_index]
+
+    prompt = (payload.prompt or "").strip() or build_prompt(shot)
+
+    # 이 샷에 등장하는 캐릭터들의 참조 이미지 로드
+    char_names = shot.get("characters") or []
+    if isinstance(char_names, str):
+        char_names = [char_names]
+    references = resolve_character_references(db, user.id, char_names)
+
+    out_dir = Path(str(storyboard_dir(scenario_id)))
+    out_dir.mkdir(parents=True, exist_ok=True)
+    target = out_dir / f"shot_{shot_index:04d}.png"
+
+    try:
+        generate_image(
+            prompt,
+            target,
+            api_key=user.gemini_api_key,
+            reference_images=references,
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"이미지 생성 실패: {str(e)[:300]}")
+
+    return {"ok": True, "shot_index": shot_index, "prompt": prompt}
+
+
+@router.get("/{scenario_id}/storyboard/{shot_index}/prompt")
+def get_shot_prompt(
+    scenario_id: int,
+    shot_index: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """기본 프롬프트 미리보기 (수정용)."""
+    sc = db.get(Scenario, scenario_id)
+    if not sc or sc.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="시나리오를 찾을 수 없습니다.")
+    shots = sc.shots or []
+    if shot_index < 0 or shot_index >= len(shots):
+        raise HTTPException(status_code=404, detail="샷 인덱스 범위 밖.")
+    return {"prompt": build_prompt(shots[shot_index])}
 
 
 @router.get("/{scenario_id}/export.xlsx")

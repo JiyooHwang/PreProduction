@@ -19,6 +19,9 @@ export function Header() {
             <Link href="/scenarios" className="text-slate-600 hover:underline">
               시나리오 분석
             </Link>
+            <Link href="/characters" className="text-slate-600 hover:underline">
+              캐릭터 라이브러리
+            </Link>
             <Link href="/settings" className="text-slate-600 hover:underline">
               설정
             </Link>

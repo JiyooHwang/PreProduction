@@ -48,6 +48,9 @@ def _apply_lightweight_migrations() -> None:
         "ALTER TABLE scenarios ADD COLUMN IF NOT EXISTS storyboard_progress_done INTEGER DEFAULT 0",
         "ALTER TABLE scenarios ADD COLUMN IF NOT EXISTS storyboard_progress_total INTEGER DEFAULT 0",
         "ALTER TABLE scenarios ADD COLUMN IF NOT EXISTS storyboard_error TEXT",
+        # 캐릭터 라이브러리 인덱스 (create_all 이 인덱스도 만들지만 안전망)
+        "CREATE INDEX IF NOT EXISTS ix_character_designs_owner_id ON character_designs(owner_id)",
+        "CREATE INDEX IF NOT EXISTS ix_character_designs_name ON character_designs(name)",
     ]
     with engine.begin() as conn:
         for stmt in statements:

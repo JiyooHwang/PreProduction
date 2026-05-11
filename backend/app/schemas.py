@@ -113,3 +113,23 @@ class ScenarioListItem(BaseModel):
     status: str
     created_at: datetime
     finished_at: Optional[datetime] = None
+
+
+class CharacterDesignOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: int
+    name: str
+    description: Optional[str] = None
+    image_mime: str = "image/png"
+    created_at: datetime
+    updated_at: datetime
+
+
+class CharacterDesignUpdate(BaseModel):
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class ShotRegenerateIn(BaseModel):
+    """샷 재생성 요청. prompt 가 비어있으면 기본 프롬프트로 재생성."""
+    prompt: Optional[str] = None

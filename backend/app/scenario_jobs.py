@@ -8,12 +8,12 @@ from queue import Queue
 
 from sqlalchemy.orm import Session
 
-from shotbreakdown.image_gen import build_prompt, generate_image
+from shotbreakdown.image_gen import ReferenceImage, build_prompt, generate_image
 from shotbreakdown.scenario import analyze_scenario
 
 from .config import settings
 from .database import SessionLocal
-from .models import JobStatus, Scenario, User
+from .models import CharacterDesign, JobStatus, Scenario, User
 
 
 logger = logging.getLogger(__name__)
@@ -75,6 +75,43 @@ def storyboard_dir(scenario_id: int) -> "object":
     return settings.storage_dir / f"scenario_{scenario_id}" / "storyboard"
 
 
+def resolve_character_references(
+    db: Session,
+    owner_id: int,
+    character_names: list[str],
+) -> list[ReferenceImage]:
+    """샷에 등장하는 캐릭터 이름과 일치하는 라이브러리 항목을 찾아 ReferenceImage 로 반환.
+
+    이름 매칭은 대소문자 무시 + 정확히 일치. 일치 항목이 없으면 빈 리스트.
+    """
+    if not character_names:
+        return []
+    names = [n for n in character_names if isinstance(n, str) and n.strip()]
+    if not names:
+        return []
+
+    rows = (
+        db.query(CharacterDesign)
+        .filter(CharacterDesign.owner_id == owner_id)
+        .all()
+    )
+    by_name_lower = {r.name.lower(): r for r in rows}
+
+    out: list[ReferenceImage] = []
+    seen: set[int] = set()
+    for n in names:
+        cd = by_name_lower.get(n.lower())
+        if cd is None or cd.id in seen:
+            continue
+        seen.add(cd.id)
+        try:
+            data = (settings.storage_dir / cd.image_path).read_bytes()
+        except OSError:
+            continue
+        out.append(ReferenceImage(data=data, mime_type=cd.image_mime, label=cd.name))
+    return out
+
+
 def _run_storyboard(scenario_id: int) -> None:
     import time
     db: Session = SessionLocal()
@@ -115,8 +152,23 @@ def _run_storyboard(scenario_id: int) -> None:
             try:
                 prompt = build_prompt(shot)
                 target = out_dir / f"shot_{i:04d}.png"  # type: ignore[operator]
-                generate_image(prompt, target, api_key=user.gemini_api_key)
-                logger.info("시나리오 %s 샷 %s 이미지 생성 OK", scenario_id, i)
+
+                # 이 샷에 등장하는 캐릭터의 라이브러리 이미지 매칭
+                shot_chars = shot.get("characters") or []
+                if isinstance(shot_chars, str):
+                    shot_chars = [shot_chars]
+                refs = resolve_character_references(db, user.id, shot_chars)
+
+                generate_image(
+                    prompt,
+                    target,
+                    api_key=user.gemini_api_key,
+                    reference_images=refs,
+                )
+                logger.info(
+                    "시나리오 %s 샷 %s 이미지 생성 OK (refs=%d)",
+                    scenario_id, i, len(refs),
+                )
             except Exception as e:
                 logger.warning("시나리오 %s 샷 %s 이미지 생성 실패: %s", scenario_id, i, e)
                 if first_error is None:

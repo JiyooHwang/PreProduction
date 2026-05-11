@@ -192,7 +192,76 @@ export function useApi() {
     storyboardImageUrl: (id: number, shotIndex: number) =>
       `${API_URL}/api/scenarios/${id}/storyboard/${shotIndex}`,
     scenarioExportUrl: (id: number) => `${API_URL}/api/scenarios/${id}/export.xlsx`,
+
+    // 샷 재생성 (커스텀 프롬프트 가능)
+    getShotPrompt: async (scenarioId: number, shotIndex: number) =>
+      (
+        await request(token, `/api/scenarios/${scenarioId}/storyboard/${shotIndex}/prompt`)
+      ).json() as Promise<{ prompt: string }>,
+    regenerateShot: async (
+      scenarioId: number,
+      shotIndex: number,
+      customPrompt?: string,
+    ) => {
+      const res = await request(
+        token,
+        `/api/scenarios/${scenarioId}/storyboard/${shotIndex}/regenerate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ prompt: customPrompt || null }),
+        },
+      );
+      return res.json() as Promise<{ ok: boolean; shot_index: number; prompt: string }>;
+    },
+
+    // 캐릭터 라이브러리
+    characters: (config?: SWRConfiguration) =>
+      useSWR<CharacterDesign[]>(token ? "/api/me/characters" : null, fetcher, config),
+    characterImageUrl: (id: number) => `${API_URL}/api/me/characters/${id}/image`,
+    createCharacter: async (name: string, description: string, file: File) => {
+      const fd = new FormData();
+      fd.append("name", name);
+      fd.append("description", description);
+      fd.append("image", file);
+      const res = await request(token, "/api/me/characters", {
+        method: "POST",
+        body: fd,
+      });
+      return res.json() as Promise<CharacterDesign>;
+    },
+    updateCharacter: async (
+      id: number,
+      patch: { name?: string; description?: string },
+    ) => {
+      const res = await request(token, `/api/me/characters/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      return res.json() as Promise<CharacterDesign>;
+    },
+    replaceCharacterImage: async (id: number, file: File) => {
+      const fd = new FormData();
+      fd.append("image", file);
+      const res = await request(token, `/api/me/characters/${id}/image`, {
+        method: "PUT",
+        body: fd,
+      });
+      return res.json() as Promise<CharacterDesign>;
+    },
+    deleteCharacter: async (id: number) =>
+      request(token, `/api/me/characters/${id}`, { method: "DELETE" }),
   };
+}
+
+export interface CharacterDesign {
+  id: number;
+  name: string;
+  description: string | null;
+  image_mime: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface ScenarioListItem {
