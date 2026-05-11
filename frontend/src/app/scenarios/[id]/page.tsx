@@ -205,8 +205,10 @@ function StoryboardUsageHint() {
             샷 N개면 약 N분 소요.
           </div>
           <div>
-            <b>🔄 샷 재생성:</b> 마음에 안 드는 샷만 골라 다시 그릴 수 있어요. 버튼을 누르면
-            현재 프롬프트가 표시되며, 그대로 다시 그리거나 수정 후 재생성 가능.
+            <b>🔄 샷 재생성:</b> 마음에 안 드는 샷만 골라 다시 그릴 수 있어요.
+            모달에서 <b>샷 사이즈/카메라 앵글/액션</b>을 빠른 편집기로 바꾸거나,
+            추가 디렉션(조명, 감정 등)을 더해 프롬프트를 새로 만들 수 있습니다.
+            완성된 프롬프트는 직접 더 수정도 가능.
           </div>
           <div>
             <b>🧑‍🎨 캐릭터 일관성:</b>{" "}
@@ -452,6 +454,7 @@ function ShotsSection({
         <RegenerateModal
           scenarioId={scenarioId}
           shotIndex={regenIdx}
+          shot={items[regenIdx]}
           onClose={() => setRegenIdx(null)}
           onDone={() => onRegenerated(regenIdx)}
         />
@@ -460,19 +463,77 @@ function ShotsSection({
   );
 }
 
+// 자주 쓰는 카메라 무브먼트 / 앵글 프리셋
+const CAMERA_PRESETS: { label: string; value: string }[] = [
+  { label: "FIX (고정)", value: "FIX" },
+  { label: "PAN (좌우)", value: "PAN" },
+  { label: "TILT (상하)", value: "TILT" },
+  { label: "DOLLY IN", value: "DOLLY IN" },
+  { label: "DOLLY OUT", value: "DOLLY OUT" },
+  { label: "ZOOM IN", value: "ZOOM IN" },
+  { label: "ZOOM OUT", value: "ZOOM OUT" },
+  { label: "TRACKING", value: "TRACKING" },
+  { label: "LOW ANGLE (앙각)", value: "LOW ANGLE" },
+  { label: "HIGH ANGLE (부감)", value: "HIGH ANGLE" },
+  { label: "BIRD'S EYE (조감)", value: "BIRD'S EYE VIEW" },
+  { label: "DUTCH (틸트)", value: "DUTCH ANGLE" },
+  { label: "POV (1인칭)", value: "POV" },
+  { label: "OTS (어깨너머)", value: "OVER THE SHOULDER" },
+];
+
+const SHOT_SIZE_PRESETS: { label: string; value: string }[] = [
+  { label: "ECU (익스트림 클로즈업)", value: "ECU" },
+  { label: "CU (클로즈업)", value: "CU" },
+  { label: "MCU (미디엄 클로즈업)", value: "MCU" },
+  { label: "MS (미디엄)", value: "MS" },
+  { label: "MLS (미디엄 롱)", value: "MLS" },
+  { label: "LS (롱샷)", value: "LS" },
+  { label: "ELS (익스트림 롱)", value: "ELS" },
+  { label: "WS (와이드)", value: "WS" },
+];
+
+function buildPromptFromShot(shot: any): string {
+  const extras: string[] = [];
+  if (shot?.fx) extras.push(`Special effects: ${shot.fx}`);
+  if (shot?.notes) extras.push(`Notes: ${shot.notes}`);
+  let charsStr = "no characters";
+  const chars = shot?.characters;
+  if (Array.isArray(chars) && chars.length > 0) {
+    charsStr = chars.join(", ");
+  } else if (typeof chars === "string" && chars.trim()) {
+    charsStr = chars;
+  }
+  return (
+    `Create a storyboard sketch for an animation scene.\n\n` +
+    `Shot: ${shot?.shot_size || "MS"} ${shot?.camera_movement || "FIX"}\n` +
+    `Characters: ${charsStr}\n` +
+    `Location: ${shot?.location || "unspecified"}\n` +
+    `Action: ${shot?.action || "scene continues"}\n` +
+    (extras.length ? extras.join("\n") + "\n" : "") +
+    `\nStyle: clean storyboard sketch, black and white pencil drawing, clear composition,\n` +
+    `single panel, professional pre-production storyboard. No text or labels.`
+  );
+}
+
 function RegenerateModal({
   scenarioId,
   shotIndex,
+  shot,
   onClose,
   onDone,
 }: {
   scenarioId: number;
   shotIndex: number;
+  shot: any;
   onClose: () => void;
   onDone: () => void;
 }) {
   const api = useApi();
   const [prompt, setPrompt] = useState<string>("");
+  const [shotSize, setShotSize] = useState<string>(shot?.shot_size || "MS");
+  const [camera, setCamera] = useState<string>(shot?.camera_movement || "FIX");
+  const [action, setAction] = useState<string>(shot?.action || "");
+  const [extraDirection, setExtraDirection] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -497,6 +558,24 @@ function RegenerateModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [scenarioId, shotIndex]);
 
+  const rebuildPrompt = () => {
+    const merged = {
+      ...shot,
+      shot_size: shotSize,
+      camera_movement: camera,
+      action: action,
+    };
+    let p = buildPromptFromShot(merged);
+    if (extraDirection.trim()) {
+      // 추가 디렉션을 Style 줄 직전에 삽입
+      p = p.replace(
+        /\nStyle: /,
+        `\nAdditional direction: ${extraDirection.trim()}\n\nStyle: `,
+      );
+    }
+    setPrompt(p);
+  };
+
   const handleRegen = async (useCustom: boolean) => {
     setErr(null);
     setBusy(true);
@@ -512,24 +591,128 @@ function RegenerateModal({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-xl max-w-2xl w-full p-6">
+      <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full p-6 max-h-[90vh] overflow-y-auto">
         <h3 className="font-semibold text-lg mb-1">샷 #{shotIndex + 1} 재생성</h3>
         <div className="text-sm text-slate-500 mb-4">
-          프롬프트를 수정하거나, 그대로 두고 기본 재생성하세요. 캐릭터 라이브러리에
-          등록된 캐릭터는 자동으로 참조 이미지로 사용됩니다.
+          카메라 앵글이나 샷 사이즈를 바꿔서 같은 장면을 다른 시점으로 그려보세요.
+          캐릭터 라이브러리에 등록된 캐릭터는 자동으로 참조 이미지로 사용됩니다.
         </div>
+
         {loading ? (
           <div className="text-sm text-slate-500">프롬프트 불러오는 중...</div>
         ) : (
           <>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              rows={10}
-              className="w-full border border-slate-300 rounded-lg p-3 text-sm font-mono"
-            />
+            {/* 구조화된 빠른 편집 */}
+            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4 mb-3">
+              <div className="text-xs font-semibold text-slate-600 mb-2">
+                빠른 편집 — 값 바꾼 뒤 아래 [📝 이 값으로 프롬프트 새로 만들기] 클릭
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">
+                    샷 사이즈
+                  </label>
+                  <select
+                    value={shotSize}
+                    onChange={(e) => setShotSize(e.target.value)}
+                    className="w-full border border-slate-300 rounded px-2 py-1 text-sm"
+                  >
+                    {SHOT_SIZE_PRESETS.find((p) => p.value === shotSize) ? null : (
+                      <option value={shotSize}>{shotSize} (현재)</option>
+                    )}
+                    {SHOT_SIZE_PRESETS.map((p) => (
+                      <option key={p.value} value={p.value}>
+                        {p.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">
+                    카메라 무브먼트 / 앵글
+                  </label>
+                  <input
+                    type="text"
+                    value={camera}
+                    onChange={(e) => setCamera(e.target.value)}
+                    placeholder="예: LOW ANGLE, ZOOM IN"
+                    className="w-full border border-slate-300 rounded px-2 py-1 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-xs text-slate-500 mb-1">
+                  빠른 카메라 프리셋 — 클릭해서 위 입력란에 적용
+                </label>
+                <div className="flex flex-wrap gap-1.5">
+                  {CAMERA_PRESETS.map((p) => (
+                    <button
+                      key={p.value}
+                      onClick={() => setCamera(p.value)}
+                      className={
+                        "text-xs px-2 py-1 rounded border transition-colors " +
+                        (camera === p.value
+                          ? "bg-purple-600 text-white border-purple-600"
+                          : "bg-white text-slate-700 border-slate-300 hover:bg-purple-50 hover:border-purple-300")
+                      }
+                    >
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-xs text-slate-500 mb-1">
+                  액션 (선택)
+                </label>
+                <input
+                  type="text"
+                  value={action}
+                  onChange={(e) => setAction(e.target.value)}
+                  placeholder="이 샷에서 일어나는 행동"
+                  className="w-full border border-slate-300 rounded px-2 py-1 text-sm"
+                />
+              </div>
+
+              <div className="mb-3">
+                <label className="block text-xs text-slate-500 mb-1">
+                  추가 디렉션 (선택) — 조명/감정/스타일 등 자유롭게
+                </label>
+                <input
+                  type="text"
+                  value={extraDirection}
+                  onChange={(e) => setExtraDirection(e.target.value)}
+                  placeholder="예: dramatic backlight, tense mood, rain falling"
+                  className="w-full border border-slate-300 rounded px-2 py-1 text-sm"
+                />
+              </div>
+
+              <button
+                onClick={rebuildPrompt}
+                className="text-sm bg-slate-900 text-white px-3 py-1.5 rounded hover:bg-slate-700"
+              >
+                📝 이 값으로 프롬프트 새로 만들기
+              </button>
+            </div>
+
+            {/* 최종 프롬프트 (직접 수정도 가능) */}
+            <div>
+              <label className="block text-xs text-slate-500 mb-1">
+                최종 프롬프트 (직접 수정 가능)
+              </label>
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={10}
+                className="w-full border border-slate-300 rounded-lg p-3 text-sm font-mono"
+              />
+            </div>
+
             {err && <div className="text-sm text-red-600 mt-2">{err}</div>}
-            <div className="flex gap-2 mt-4 justify-end">
+            <div className="flex gap-2 mt-4 justify-end flex-wrap">
               <button
                 onClick={onClose}
                 disabled={busy}
@@ -541,7 +724,7 @@ function RegenerateModal({
                 onClick={() => handleRegen(false)}
                 disabled={busy}
                 className="bg-slate-200 text-slate-800 px-4 py-2 rounded-lg hover:bg-slate-300"
-                title="원래 프롬프트로 재생성 (입력란 수정사항 무시)"
+                title="원래 프롬프트로 재생성 (위 수정사항 무시)"
               >
                 기본으로 재생성
               </button>
