@@ -137,6 +137,8 @@ export default function ScenarioDetailPage() {
           </div>
         )}
 
+        {sc?.status === "done" && <StoryboardUsageHint />}
+
         {sc?.status === "done" && (
           <>
             <div className="flex gap-2 mb-4">
@@ -179,6 +181,48 @@ export default function ScenarioDetailPage() {
           </>
         )}
       </main>
+    </div>
+  );
+}
+
+function StoryboardUsageHint() {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="bg-purple-50 border border-purple-200 rounded-2xl p-4 mb-6 text-sm">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <span className="font-semibold text-purple-900">
+          💡 스토리보드 생성 / 재생성 사용법
+        </span>
+        <span className="text-purple-700 text-xs">{open ? "접기" : "펼치기"}</span>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-2 text-purple-900">
+          <div>
+            <b>🎨 스토리보드 생성:</b> 분석된 모든 샷을 한 번에 이미지로 생성합니다.
+            샷 N개면 약 N분 소요.
+          </div>
+          <div>
+            <b>🔄 샷 재생성:</b> 마음에 안 드는 샷만 골라 다시 그릴 수 있어요. 버튼을 누르면
+            현재 프롬프트가 표시되며, 그대로 다시 그리거나 수정 후 재생성 가능.
+          </div>
+          <div>
+            <b>🧑‍🎨 캐릭터 일관성:</b>{" "}
+            <a href="/characters" className="underline font-semibold">
+              캐릭터 라이브러리
+            </a>{" "}
+            에 캐릭터별 디자인을 등록해두면, 시나리오의 같은 이름 캐릭터가 등장하는
+            샷에서 자동으로 그 디자인을 참조 이미지로 활용합니다. 이름은{" "}
+            <b>대소문자 무시, 정확히 일치</b>해야 매칭됩니다.
+          </div>
+          <div className="text-purple-700">
+            팁: 캐릭터 디자인이 잘 안 반영되면 재생성 시 프롬프트에 &quot;in the style of
+            the reference character design&quot; 등 한 줄을 추가해보세요.
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -87,6 +87,8 @@ export default function CharactersPage() {
           )}
         </div>
 
+        <UsageGuide />
+
         {creating && (
           <div className="bg-white rounded-2xl shadow p-5 mb-6 border border-slate-200">
             <h2 className="font-semibold mb-3">새 캐릭터 추가</h2>
@@ -167,6 +169,78 @@ export default function CharactersPage() {
           ))}
         </div>
       </main>
+    </div>
+  );
+}
+
+function UsageGuide() {
+  const [open, setOpen] = useState(true);
+  return (
+    <div className="bg-purple-50 border border-purple-200 rounded-2xl p-5 mb-6">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center justify-between w-full text-left"
+      >
+        <div className="font-semibold text-purple-900">
+          💡 캐릭터 라이브러리 사용법
+        </div>
+        <span className="text-purple-700 text-sm">{open ? "접기" : "펼치기"}</span>
+      </button>
+      {open && (
+        <div className="mt-3 space-y-3 text-sm text-purple-900">
+          <div>
+            <div className="font-semibold mb-1">1. 이름 매칭</div>
+            <div className="text-purple-800">
+              시나리오 분석에서 추출된 캐릭터 이름과 라이브러리 이름이{" "}
+              <b>대소문자 무시, 정확히 일치</b>해야 매칭됩니다.
+              <ul className="list-disc ml-5 mt-1 space-y-0.5 text-purple-700">
+                <li>
+                  ✅ 시나리오: <code>&quot;Eun&quot;</code> / 라이브러리:{" "}
+                  <code>&quot;EUN&quot;</code> → 매칭됨
+                </li>
+                <li>
+                  ❌ 시나리오: <code>&quot;은이&quot;</code> / 라이브러리:{" "}
+                  <code>&quot;Eun&quot;</code> → 매칭 안 됨
+                </li>
+              </ul>
+              <div className="mt-1 text-purple-700">
+                팁: 시나리오 분석 결과의 캐릭터 이름을 먼저 확인한 뒤, 그 이름과
+                <b> 똑같이</b> 라이브러리에 등록하세요.
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <div className="font-semibold mb-1">2. 라이브러리에 없는 캐릭터</div>
+            <div className="text-purple-800">
+              매칭되는 항목이 없으면 그냥 텍스트 프롬프트만으로 생성됩니다 (기존
+              방식과 동일). 라이브러리를 안 만들어도 스토리보드 생성은 그대로 작동.
+            </div>
+          </div>
+
+          <div>
+            <div className="font-semibold mb-1">3. 참조 이미지의 효과</div>
+            <div className="text-purple-800">
+              Gemini 가 멀티모달 입력으로 받은 이미지를 <b>스타일/외모 참조</b>로
+              활용합니다. 100% 일관성은 아니고 &quot;비슷한 분위기&quot; 정도로
+              생각하세요. 세부 디테일이 안 맞으면 샷 옆의 <b>🔄 재생성</b> 으로
+              프롬프트 직접 수정해서 보강 가능.
+            </div>
+          </div>
+
+          <div>
+            <div className="font-semibold mb-1">4. 권장 이미지 가이드</div>
+            <div className="text-purple-800">
+              <ul className="list-disc ml-5 space-y-0.5">
+                <li>정면 또는 3/4 각도의 깔끔한 캐릭터 디자인</li>
+                <li>배경 단순할수록 좋음 (흰 배경/단색 추천)</li>
+                <li>PNG/JPG, 5MB 이하</li>
+                <li>여러 각도가 합쳐진 캐릭터 시트도 OK</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
