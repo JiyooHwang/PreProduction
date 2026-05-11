@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useApi } from "@/lib/api";
 
@@ -13,6 +14,7 @@ export function UploadForm({
   hasExistingVideo?: boolean;
 }) {
   const api = useApi();
+  const { data: characters } = api.characters({ refreshInterval: 0 });
   const [file, setFile] = useState<File | null>(null);
   const [threshold, setThreshold] = useState(27);
   const [skipAnalysis, setSkipAnalysis] = useState(false);
@@ -82,6 +84,47 @@ export function UploadForm({
         />
         AI 분석 생략 (컷 감지 + 썸네일만)
       </label>
+
+      {/* 캐릭터 라이브러리 자동 사용 안내 */}
+      {!skipAnalysis && (
+        <div className="mt-3 p-3 rounded-lg bg-purple-50 border border-purple-200 text-xs">
+          <div className="flex items-start gap-2">
+            <span className="text-purple-700 font-semibold">🧑‍🎨</span>
+            <div className="text-purple-900">
+              {(characters || []).length > 0 ? (
+                <>
+                  <b>캐릭터 라이브러리 자동 사용 중</b> — 등록된{" "}
+                  <b>{characters!.length}명</b>의 캐릭터(
+                  {characters!
+                    .slice(0, 5)
+                    .map((c) => c.name)
+                    .join(", ")}
+                  {characters!.length > 5 ? "…" : ""})를 비전 분석 참조로 첨부합니다.
+                  Gemini 가 영상에서 이 인물들을 발견하면 라이브러리 이름과 매칭해
+                  일관되게 라벨링해요.
+                  <div className="mt-1 text-purple-700">
+                    더 정확한 매칭을 원하면{" "}
+                    <Link href="/characters" className="underline font-semibold">
+                      라이브러리
+                    </Link>{" "}
+                    에서 각 캐릭터에 외형 설명(영어)을 채워두세요.
+                  </div>
+                </>
+              ) : (
+                <>
+                  <b>캐릭터 라이브러리 비어있음</b> — 비전 분석이 영상 속 인물을
+                  외형으로만 묘사하게 됩니다 (예: &quot;검은 머리 여성&quot;).
+                  같은 인물을 매 샷마다 같은 이름으로 부르려면{" "}
+                  <Link href="/characters" className="underline font-semibold">
+                    캐릭터 라이브러리
+                  </Link>{" "}
+                  에 등장인물을 미리 등록해두세요.
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
       <div className="mt-4 flex items-center gap-3 flex-wrap">
         <button
           onClick={submit}

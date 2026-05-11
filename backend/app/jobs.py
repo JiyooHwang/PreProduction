@@ -13,10 +13,11 @@ from sqlalchemy.orm import Session
 from shotbreakdown.models import ShotAnalysis as CoreAnalysis
 from shotbreakdown.pipeline import build_shot_list
 from shotbreakdown.providers import build_provider
+from shotbreakdown.providers.base import CharacterRef
 
 from .config import settings
 from .database import SessionLocal
-from .models import Job, JobStatus, Shot
+from .models import CharacterDesign, Job, JobStatus, Shot
 
 
 logger = logging.getLogger(__name__)
@@ -81,12 +82,39 @@ def _run_job(job_id: int) -> None:
         output_dir.mkdir(parents=True, exist_ok=True)
 
         vision = None
+        character_refs: list[CharacterRef] = []
         if not job.skip_analysis:
             if not owner.gemini_api_key:
                 raise RuntimeError(
                     "Gemini API 키가 설정되지 않았습니다. 프로필 설정에서 키를 등록하세요."
                 )
             vision = build_provider("gemini", api_key=owner.gemini_api_key)
+
+            # 사용자 캐릭터 라이브러리를 비전 분석 참조로 자동 첨부
+            # → 같은 작품 내 캐릭터 이름이 일관되게 라벨링됨
+            library = (
+                db.query(CharacterDesign)
+                .filter(CharacterDesign.owner_id == owner.id)
+                .all()
+            )
+            for cd in library:
+                try:
+                    data = (settings.storage_dir / cd.image_path).read_bytes()
+                except OSError:
+                    continue
+                character_refs.append(
+                    CharacterRef(
+                        name=cd.name,
+                        image_data=data,
+                        image_mime=cd.image_mime,
+                        description=cd.description or None,
+                    )
+                )
+            if character_refs:
+                logger.info(
+                    "작업 %s: 캐릭터 라이브러리 %d개를 비전 분석 참조로 첨부",
+                    job_id, len(character_refs),
+                )
 
         def on_progress(done: int, total: int, msg: str) -> None:
             db.refresh(job)
@@ -104,6 +132,7 @@ def _run_job(job_id: int) -> None:
             threshold=job.threshold,
             vision=vision,
             on_progress=on_progress,
+            character_refs=character_refs or None,
         )
 
         # 기존 샷 제거 후 재삽입 (재실행 대비)

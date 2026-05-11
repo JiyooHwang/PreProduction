@@ -9,7 +9,7 @@ from typing import Callable, Optional
 from .detect import detect_shots
 from .extract import ensure_ffmpeg, extract_frame
 from .models import Shot
-from .providers.base import VisionProvider
+from .providers.base import CharacterRef, VisionProvider
 from .timecode import seconds_to_tc
 
 
@@ -44,8 +44,13 @@ def build_shot_list(
     threshold: float = 27.0,
     vision: Optional[VisionProvider] = None,
     on_progress: Optional[ProgressCb] = None,
+    character_refs: Optional[list[CharacterRef]] = None,
 ) -> list[Shot]:
-    """전체 파이프라인을 실행하고 Shot 리스트를 반환."""
+    """전체 파이프라인을 실행하고 Shot 리스트를 반환.
+
+    character_refs: 사용자 캐릭터 라이브러리. 비전 분석 시 매 샷마다 함께 전달돼
+    캐릭터 이름이 일관되게 라벨링되도록 한다.
+    """
     ensure_ffmpeg()
 
     if on_progress:
@@ -87,7 +92,7 @@ def build_shot_list(
             frame_paths = [start_frame, mid_frame, end_frame]
 
             try:
-                analysis = vision.analyze_shot(frame_paths)
+                analysis = vision.analyze_shot(frame_paths, character_refs=character_refs)
             except Exception as e:  # provider 호출 실패는 한 컷만 비워두고 계속
                 from .models import ShotAnalysis
 
