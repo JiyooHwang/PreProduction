@@ -469,22 +469,40 @@ function ShotsSection({
   );
 }
 
-// 자주 쓰는 카메라 무브먼트 / 앵글 프리셋
-const CAMERA_PRESETS: { label: string; value: string }[] = [
-  { label: "FIX (고정)", value: "FIX" },
-  { label: "PAN (좌우)", value: "PAN" },
-  { label: "TILT (상하)", value: "TILT" },
-  { label: "DOLLY IN", value: "DOLLY IN" },
-  { label: "DOLLY OUT", value: "DOLLY OUT" },
-  { label: "ZOOM IN", value: "ZOOM IN" },
-  { label: "ZOOM OUT", value: "ZOOM OUT" },
-  { label: "TRACKING", value: "TRACKING" },
-  { label: "LOW ANGLE (앙각)", value: "LOW ANGLE" },
-  { label: "HIGH ANGLE (부감)", value: "HIGH ANGLE" },
-  { label: "BIRD'S EYE (조감)", value: "BIRD'S EYE VIEW" },
-  { label: "DUTCH (틸트)", value: "DUTCH ANGLE" },
-  { label: "POV (1인칭)", value: "POV" },
-  { label: "OTS (어깨너머)", value: "OVER THE SHOULDER" },
+// 자주 쓰는 카메라 무브먼트 / 앵글 프리셋. 그룹별로 묶어 UI 에서 섹션 표시.
+type CameraPreset = { label: string; value: string; hint?: string };
+const CAMERA_PRESET_GROUPS: { title: string; items: CameraPreset[] }[] = [
+  {
+    title: "앵글 (수직축)",
+    items: [
+      { label: "EYE LEVEL (아이 레벨)", value: "EYE LEVEL", hint: "자연스럽고 객관적" },
+      { label: "HIGH ANGLE (하이 / 부감)", value: "HIGH ANGLE", hint: "왜소·연약·고독" },
+      { label: "LOW ANGLE (로우 / 앙각)", value: "LOW ANGLE", hint: "웅장·강력·영웅적" },
+      { label: "BIRD'S EYE (조감 / 신의 시점)", value: "BIRD'S EYE VIEW", hint: "수직 90° 상공" },
+      { label: "WORM'S EYE (웜즈 / 극앙각)", value: "WORM'S EYE VIEW", hint: "지면 시점, 압도적" },
+      { label: "DUTCH (사각)", value: "DUTCH ANGLE", hint: "불안·긴장·역동" },
+    ],
+  },
+  {
+    title: "무브먼트",
+    items: [
+      { label: "FIX (고정)", value: "FIX" },
+      { label: "PAN (좌우)", value: "PAN" },
+      { label: "TILT (상하)", value: "TILT" },
+      { label: "DOLLY IN", value: "DOLLY IN" },
+      { label: "DOLLY OUT", value: "DOLLY OUT" },
+      { label: "ZOOM IN", value: "ZOOM IN" },
+      { label: "ZOOM OUT", value: "ZOOM OUT" },
+      { label: "TRACKING", value: "TRACKING" },
+    ],
+  },
+  {
+    title: "시점 / 프레이밍",
+    items: [
+      { label: "POV (1인칭)", value: "POV" },
+      { label: "OTS (어깨너머)", value: "OVER THE SHOULDER" },
+    ],
+  },
 ];
 
 const SHOT_SIZE_PRESETS: { label: string; value: string }[] = [
@@ -499,37 +517,48 @@ const SHOT_SIZE_PRESETS: { label: string; value: string }[] = [
 ];
 
 // 약어 → 자연어 매핑. 백엔드 image_gen.py 와 일치해야 한다.
+// 표준 촬영 용어 + 정서적/시각적 효과를 같이 적어 모델이 의도된 분위기까지 반영.
 const CAMERA_DESC_MAP: Record<string, string> = {
-  FIX: "static camera, no movement, eye-level framing",
-  STATIC: "static camera, no movement",
+  // === 카메라 앵글 ===
+  "EYE LEVEL":
+    "eye-level angle, camera placed at the subject's eye height, horizontal viewpoint giving a natural, neutral, and objective feel",
+  "HIGH ANGLE":
+    "high angle shot, camera positioned above the subject looking downward, making the subject appear small, vulnerable, lonely, or weak; diminishing the subject's power",
+  "LOW ANGLE":
+    "low angle shot, camera positioned below the subject looking upward, making the subject appear grand, powerful, dominant, heroic and imposing",
+  "BIRD'S EYE":
+    "bird's eye view, an extreme high angle shot from directly overhead (camera pointing straight down at 90 degrees vertical) — the 'god's view' that emphasizes layout, scale, and detachment from the scene",
+  "BIRD'S EYE VIEW":
+    "bird's eye view, an extreme high angle shot from directly overhead (camera pointing straight down at 90 degrees vertical) — the 'god's view' that emphasizes layout, scale, and detachment from the scene",
+  "WORM'S EYE":
+    "worm's eye view, an extreme low angle shot from ground level looking nearly straight up, making the subject feel overwhelming, monumental, and towering",
+  "WORM'S EYE VIEW":
+    "worm's eye view, an extreme low angle shot from ground level looking nearly straight up, making the subject feel overwhelming, monumental, and towering",
+  DUTCH:
+    "dutch angle (canted/tilted angle), camera intentionally tilted on its roll axis creating a slanted horizon; conveys unease, tension, disorientation, or dynamic energy",
+  "DUTCH ANGLE":
+    "dutch angle (canted/tilted angle), camera intentionally tilted on its roll axis creating a slanted horizon; conveys unease, tension, disorientation, or dynamic energy",
+
+  // === 카메라 무브먼트 ===
+  FIX: "static camera, no movement, locked-off frame",
+  STATIC: "static camera, no movement, locked-off frame",
   PAN: "horizontal panning camera movement across the scene",
   "PAN LEFT": "camera panning horizontally to the left",
   "PAN RIGHT": "camera panning horizontally to the right",
   TILT: "vertical tilting camera movement",
   "TILT UP": "camera tilting upward",
   "TILT DOWN": "camera tilting downward",
-  "DOLLY IN": "camera dollying in toward the subject, moving closer",
-  "DOLLY OUT": "camera dollying away from the subject, pulling back",
-  "ZOOM IN": "zooming in on the subject, frame tightens",
-  "ZOOM OUT": "zooming out from the subject, frame widens",
+  "DOLLY IN": "camera dollying in toward the subject, moving physically closer",
+  "DOLLY OUT": "camera dollying away from the subject, physically pulling back",
+  "ZOOM IN": "zooming in on the subject, frame tightens via lens",
+  "ZOOM OUT": "zooming out from the subject, frame widens via lens",
   TRACKING: "tracking shot, camera following the subject in motion",
-  "LOW ANGLE":
-    "low angle shot, camera positioned below the subject looking upward, making the subject appear larger and more dominant",
-  "HIGH ANGLE":
-    "high angle shot, camera positioned above the subject looking downward, making the subject appear smaller",
-  "BIRD'S EYE":
-    "bird's eye view, extreme high angle looking straight down from directly above the scene",
-  "BIRD'S EYE VIEW":
-    "bird's eye view, extreme high angle looking straight down from directly above the scene",
-  DUTCH:
-    "dutch angle, camera tilted diagonally on its roll axis creating an unsettling slanted frame",
-  "DUTCH ANGLE":
-    "dutch angle, camera tilted diagonally on its roll axis creating an unsettling slanted frame",
-  POV:
-    "first-person POV shot from the character's perspective, as if seen through their eyes",
-  OTS: "over-the-shoulder shot, framed from behind one character looking toward another",
+
+  // === 시점 / 프레이밍 ===
+  POV: "first-person POV shot from the character's own perspective, as if seen through their eyes",
+  OTS: "over-the-shoulder shot, framed from behind one character looking toward another, with the back of the foreground character's head/shoulder visible",
   "OVER THE SHOULDER":
-    "over-the-shoulder shot, framed from behind one character looking toward another",
+    "over-the-shoulder shot, framed from behind one character looking toward another, with the back of the foreground character's head/shoulder visible",
 };
 
 const SHOT_SIZE_DESC_MAP: Record<string, string> = {
@@ -713,23 +742,33 @@ function RegenerateModal({
               </div>
 
               <div className="mb-3">
-                <label className="block text-xs text-slate-500 mb-1">
+                <label className="block text-xs text-slate-500 mb-2">
                   빠른 카메라 프리셋 — 클릭해서 위 입력란에 적용
                 </label>
-                <div className="flex flex-wrap gap-1.5">
-                  {CAMERA_PRESETS.map((p) => (
-                    <button
-                      key={p.value}
-                      onClick={() => setCamera(p.value)}
-                      className={
-                        "text-xs px-2 py-1 rounded border transition-colors " +
-                        (camera === p.value
-                          ? "bg-purple-600 text-white border-purple-600"
-                          : "bg-white text-slate-700 border-slate-300 hover:bg-purple-50 hover:border-purple-300")
-                      }
-                    >
-                      {p.label}
-                    </button>
+                <div className="space-y-2">
+                  {CAMERA_PRESET_GROUPS.map((g) => (
+                    <div key={g.title}>
+                      <div className="text-[10px] uppercase tracking-wider text-slate-400 mb-1">
+                        {g.title}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {g.items.map((p) => (
+                          <button
+                            key={p.value}
+                            onClick={() => setCamera(p.value)}
+                            title={p.hint}
+                            className={
+                              "text-xs px-2 py-1 rounded border transition-colors " +
+                              (camera === p.value
+                                ? "bg-purple-600 text-white border-purple-600"
+                                : "bg-white text-slate-700 border-slate-300 hover:bg-purple-50 hover:border-purple-300")
+                            }
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   ))}
                 </div>
               </div>

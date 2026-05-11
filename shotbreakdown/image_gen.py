@@ -34,30 +34,80 @@ single panel, professional pre-production storyboard. No text or labels."""
 
 
 # 약어를 자연어로 풀어서 모델이 카메라 방향을 정확히 잡도록.
+# 표준 촬영 용어 + 정서적/시각적 효과를 함께 명시해 모델이 의도된 분위기까지 반영하도록.
 # 사용자가 직접 입력한 자유 텍스트도 그대로 통과 (매핑에 없으면 원문 사용).
 _CAMERA_MAP = {
-    "FIX": "static camera, no movement, eye-level framing",
-    "STATIC": "static camera, no movement",
+    # === 카메라 앵글 (수직축) ===
+    "EYE LEVEL": (
+        "eye-level angle, camera placed at the subject's eye height, "
+        "horizontal viewpoint giving a natural, neutral, and objective feel"
+    ),
+    "HIGH ANGLE": (
+        "high angle shot, camera positioned above the subject looking downward, "
+        "making the subject appear small, vulnerable, lonely, or weak; "
+        "diminishing the subject's power"
+    ),
+    "LOW ANGLE": (
+        "low angle shot, camera positioned below the subject looking upward, "
+        "making the subject appear grand, powerful, dominant, heroic and imposing"
+    ),
+    "BIRD'S EYE": (
+        "bird's eye view, an extreme high angle shot from directly overhead "
+        "(camera pointing straight down at 90 degrees vertical) — the 'god's view' "
+        "that emphasizes layout, scale, and detachment from the scene"
+    ),
+    "BIRD'S EYE VIEW": (
+        "bird's eye view, an extreme high angle shot from directly overhead "
+        "(camera pointing straight down at 90 degrees vertical) — the 'god's view' "
+        "that emphasizes layout, scale, and detachment from the scene"
+    ),
+    "WORM'S EYE": (
+        "worm's eye view, an extreme low angle shot from ground level looking nearly "
+        "straight up, making the subject feel overwhelming, monumental, and towering"
+    ),
+    "WORM'S EYE VIEW": (
+        "worm's eye view, an extreme low angle shot from ground level looking nearly "
+        "straight up, making the subject feel overwhelming, monumental, and towering"
+    ),
+    "DUTCH": (
+        "dutch angle (canted/tilted angle), camera intentionally tilted on its roll axis "
+        "creating a slanted horizon; conveys unease, tension, disorientation, "
+        "or dynamic energy"
+    ),
+    "DUTCH ANGLE": (
+        "dutch angle (canted/tilted angle), camera intentionally tilted on its roll axis "
+        "creating a slanted horizon; conveys unease, tension, disorientation, "
+        "or dynamic energy"
+    ),
+
+    # === 카메라 무브먼트 ===
+    "FIX": "static camera, no movement, locked-off frame",
+    "STATIC": "static camera, no movement, locked-off frame",
     "PAN": "horizontal panning camera movement across the scene",
     "PAN LEFT": "camera panning horizontally to the left",
     "PAN RIGHT": "camera panning horizontally to the right",
     "TILT": "vertical tilting camera movement",
     "TILT UP": "camera tilting upward",
     "TILT DOWN": "camera tilting downward",
-    "DOLLY IN": "camera dollying in toward the subject, moving closer",
-    "DOLLY OUT": "camera dollying away from the subject, pulling back",
-    "ZOOM IN": "zooming in on the subject, frame tightens",
-    "ZOOM OUT": "zooming out from the subject, frame widens",
+    "DOLLY IN": "camera dollying in toward the subject, moving physically closer",
+    "DOLLY OUT": "camera dollying away from the subject, physically pulling back",
+    "ZOOM IN": "zooming in on the subject, frame tightens via lens",
+    "ZOOM OUT": "zooming out from the subject, frame widens via lens",
     "TRACKING": "tracking shot, camera following the subject in motion",
-    "LOW ANGLE": "low angle shot, camera positioned below the subject looking upward, making the subject appear larger and more dominant",
-    "HIGH ANGLE": "high angle shot, camera positioned above the subject looking downward, making the subject appear smaller",
-    "BIRD'S EYE": "bird's eye view, extreme high angle looking straight down from directly above the scene",
-    "BIRD'S EYE VIEW": "bird's eye view, extreme high angle looking straight down from directly above the scene",
-    "DUTCH": "dutch angle, camera tilted diagonally on its roll axis creating an unsettling slanted frame",
-    "DUTCH ANGLE": "dutch angle, camera tilted diagonally on its roll axis creating an unsettling slanted frame",
-    "POV": "first-person POV shot from the character's perspective, as if seen through their eyes",
-    "OTS": "over-the-shoulder shot, framed from behind one character looking toward another",
-    "OVER THE SHOULDER": "over-the-shoulder shot, framed from behind one character looking toward another",
+
+    # === 시점 / 프레이밍 ===
+    "POV": (
+        "first-person POV shot from the character's own perspective, "
+        "as if seen through their eyes"
+    ),
+    "OTS": (
+        "over-the-shoulder shot, framed from behind one character looking toward "
+        "another, with the back of the foreground character's head/shoulder visible"
+    ),
+    "OVER THE SHOULDER": (
+        "over-the-shoulder shot, framed from behind one character looking toward "
+        "another, with the back of the foreground character's head/shoulder visible"
+    ),
 }
 
 _SHOT_SIZE_MAP = {
