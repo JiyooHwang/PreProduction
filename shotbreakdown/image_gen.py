@@ -19,9 +19,11 @@ class ReferenceImage:
     label: Optional[str] = None  # 예: 캐릭터 이름. 프롬프트 보강용
 
 
-IMAGE_PROMPT_TEMPLATE = """Create a storyboard sketch for an animation scene.
+IMAGE_PROMPT_TEMPLATE = """Create a storyboard sketch for an animation scene with the following camera direction.
 
-Shot: {shot_size} {camera}
+CAMERA: {camera_desc}
+SHOT TYPE: {shot_size_desc}
+
 Characters: {characters}
 Location: {location}
 Action: {action}
@@ -29,6 +31,59 @@ Action: {action}
 
 Style: clean storyboard sketch, black and white pencil drawing, clear composition,
 single panel, professional pre-production storyboard. No text or labels."""
+
+
+# 약어를 자연어로 풀어서 모델이 카메라 방향을 정확히 잡도록.
+# 사용자가 직접 입력한 자유 텍스트도 그대로 통과 (매핑에 없으면 원문 사용).
+_CAMERA_MAP = {
+    "FIX": "static camera, no movement, eye-level framing",
+    "STATIC": "static camera, no movement",
+    "PAN": "horizontal panning camera movement across the scene",
+    "PAN LEFT": "camera panning horizontally to the left",
+    "PAN RIGHT": "camera panning horizontally to the right",
+    "TILT": "vertical tilting camera movement",
+    "TILT UP": "camera tilting upward",
+    "TILT DOWN": "camera tilting downward",
+    "DOLLY IN": "camera dollying in toward the subject, moving closer",
+    "DOLLY OUT": "camera dollying away from the subject, pulling back",
+    "ZOOM IN": "zooming in on the subject, frame tightens",
+    "ZOOM OUT": "zooming out from the subject, frame widens",
+    "TRACKING": "tracking shot, camera following the subject in motion",
+    "LOW ANGLE": "low angle shot, camera positioned below the subject looking upward, making the subject appear larger and more dominant",
+    "HIGH ANGLE": "high angle shot, camera positioned above the subject looking downward, making the subject appear smaller",
+    "BIRD'S EYE": "bird's eye view, extreme high angle looking straight down from directly above the scene",
+    "BIRD'S EYE VIEW": "bird's eye view, extreme high angle looking straight down from directly above the scene",
+    "DUTCH": "dutch angle, camera tilted diagonally on its roll axis creating an unsettling slanted frame",
+    "DUTCH ANGLE": "dutch angle, camera tilted diagonally on its roll axis creating an unsettling slanted frame",
+    "POV": "first-person POV shot from the character's perspective, as if seen through their eyes",
+    "OTS": "over-the-shoulder shot, framed from behind one character looking toward another",
+    "OVER THE SHOULDER": "over-the-shoulder shot, framed from behind one character looking toward another",
+}
+
+_SHOT_SIZE_MAP = {
+    "ECU": "extreme close-up, framing only a small detail such as eyes or a mouth",
+    "CU": "close-up shot, the face fills most of the frame",
+    "MCU": "medium close-up, framing from the chest up to the head",
+    "MS": "medium shot, framing from the waist up to the head",
+    "MLS": "medium long shot, framing from the knees up to the head",
+    "LS": "long shot, the full body of the subject is visible within the surroundings",
+    "ELS": "extreme long shot, the subject appears small within a vast environment",
+    "WS": "wide shot, an expansive view of the whole scene",
+}
+
+
+def _describe_camera(value: str | None) -> str:
+    if not value:
+        return _CAMERA_MAP["FIX"]
+    key = value.strip().upper()
+    return _CAMERA_MAP.get(key, value.strip())
+
+
+def _describe_shot_size(value: str | None) -> str:
+    if not value:
+        return _SHOT_SIZE_MAP["MS"]
+    key = value.strip().upper()
+    return _SHOT_SIZE_MAP.get(key, value.strip())
 
 
 def build_prompt(shot: dict) -> str:
@@ -45,8 +100,8 @@ def build_prompt(shot: dict) -> str:
         chars_str = str(chars)
 
     return IMAGE_PROMPT_TEMPLATE.format(
-        shot_size=shot.get("shot_size") or "MS",
-        camera=shot.get("camera_movement") or "FIX",
+        shot_size_desc=_describe_shot_size(shot.get("shot_size")),
+        camera_desc=_describe_camera(shot.get("camera_movement")),
         characters=chars_str,
         location=shot.get("location") or "unspecified",
         action=shot.get("action") or "scene continues",

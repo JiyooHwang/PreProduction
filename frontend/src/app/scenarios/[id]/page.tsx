@@ -492,6 +492,63 @@ const SHOT_SIZE_PRESETS: { label: string; value: string }[] = [
   { label: "WS (와이드)", value: "WS" },
 ];
 
+// 약어 → 자연어 매핑. 백엔드 image_gen.py 와 일치해야 한다.
+const CAMERA_DESC_MAP: Record<string, string> = {
+  FIX: "static camera, no movement, eye-level framing",
+  STATIC: "static camera, no movement",
+  PAN: "horizontal panning camera movement across the scene",
+  "PAN LEFT": "camera panning horizontally to the left",
+  "PAN RIGHT": "camera panning horizontally to the right",
+  TILT: "vertical tilting camera movement",
+  "TILT UP": "camera tilting upward",
+  "TILT DOWN": "camera tilting downward",
+  "DOLLY IN": "camera dollying in toward the subject, moving closer",
+  "DOLLY OUT": "camera dollying away from the subject, pulling back",
+  "ZOOM IN": "zooming in on the subject, frame tightens",
+  "ZOOM OUT": "zooming out from the subject, frame widens",
+  TRACKING: "tracking shot, camera following the subject in motion",
+  "LOW ANGLE":
+    "low angle shot, camera positioned below the subject looking upward, making the subject appear larger and more dominant",
+  "HIGH ANGLE":
+    "high angle shot, camera positioned above the subject looking downward, making the subject appear smaller",
+  "BIRD'S EYE":
+    "bird's eye view, extreme high angle looking straight down from directly above the scene",
+  "BIRD'S EYE VIEW":
+    "bird's eye view, extreme high angle looking straight down from directly above the scene",
+  DUTCH:
+    "dutch angle, camera tilted diagonally on its roll axis creating an unsettling slanted frame",
+  "DUTCH ANGLE":
+    "dutch angle, camera tilted diagonally on its roll axis creating an unsettling slanted frame",
+  POV:
+    "first-person POV shot from the character's perspective, as if seen through their eyes",
+  OTS: "over-the-shoulder shot, framed from behind one character looking toward another",
+  "OVER THE SHOULDER":
+    "over-the-shoulder shot, framed from behind one character looking toward another",
+};
+
+const SHOT_SIZE_DESC_MAP: Record<string, string> = {
+  ECU: "extreme close-up, framing only a small detail such as eyes or a mouth",
+  CU: "close-up shot, the face fills most of the frame",
+  MCU: "medium close-up, framing from the chest up to the head",
+  MS: "medium shot, framing from the waist up to the head",
+  MLS: "medium long shot, framing from the knees up to the head",
+  LS: "long shot, the full body of the subject is visible within the surroundings",
+  ELS: "extreme long shot, the subject appears small within a vast environment",
+  WS: "wide shot, an expansive view of the whole scene",
+};
+
+function describeCamera(v: string | null | undefined): string {
+  if (!v) return CAMERA_DESC_MAP.FIX;
+  const k = v.trim().toUpperCase();
+  return CAMERA_DESC_MAP[k] ?? v.trim();
+}
+
+function describeShotSize(v: string | null | undefined): string {
+  if (!v) return SHOT_SIZE_DESC_MAP.MS;
+  const k = v.trim().toUpperCase();
+  return SHOT_SIZE_DESC_MAP[k] ?? v.trim();
+}
+
 function buildPromptFromShot(shot: any): string {
   const extras: string[] = [];
   if (shot?.fx) extras.push(`Special effects: ${shot.fx}`);
@@ -504,8 +561,9 @@ function buildPromptFromShot(shot: any): string {
     charsStr = chars;
   }
   return (
-    `Create a storyboard sketch for an animation scene.\n\n` +
-    `Shot: ${shot?.shot_size || "MS"} ${shot?.camera_movement || "FIX"}\n` +
+    `Create a storyboard sketch for an animation scene with the following camera direction.\n\n` +
+    `CAMERA: ${describeCamera(shot?.camera_movement)}\n` +
+    `SHOT TYPE: ${describeShotSize(shot?.shot_size)}\n\n` +
     `Characters: ${charsStr}\n` +
     `Location: ${shot?.location || "unspecified"}\n` +
     `Action: ${shot?.action || "scene continues"}\n` +
