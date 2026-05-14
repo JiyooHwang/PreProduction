@@ -151,6 +151,8 @@ def _run_job(job_id: int) -> None:
                     duration_seconds=s.duration_seconds,
                     duration_frames=s.duration_frames,
                     thumbnail_path=str(s.thumbnail_path) if s.thumbnail_path else None,
+                    sequence_number=s.sequence_number,
+                    shot_number=s.shot_number,
                     shot_size=a.shot_size,
                     camera_movement=a.camera_movement,
                     characters=a.characters or None,

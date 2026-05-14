@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { Shot } from "@/lib/api";
-import { useApi } from "@/lib/api";
+import { formatShotCode, useApi } from "@/lib/api";
 
 const FIELDS: {
   key: keyof Shot;
@@ -51,6 +51,7 @@ export function ShotTable({
         <thead className="bg-slate-100 text-slate-700">
           <tr>
             <th className="px-3 py-2 text-left w-14">컷#</th>
+            <th className="px-3 py-2 text-left w-32">코드</th>
             <th className="px-3 py-2 text-left w-28">시작 TC</th>
             <th className="px-3 py-2 text-left w-28">끝 TC</th>
             <th className="px-3 py-2 text-left w-20">길이</th>
@@ -66,6 +67,9 @@ export function ShotTable({
           {shots.map((s) => (
             <tr key={s.id} className="border-t align-top">
               <td className="px-3 py-2 font-mono">{s.index}</td>
+              <td className="px-3 py-2 font-mono text-xs">
+                {formatShotCode(s.sequence_number, s.shot_number)}
+              </td>
               <td className="px-3 py-2 font-mono text-xs">{s.start_tc}</td>
               <td className="px-3 py-2 font-mono text-xs">{s.end_tc}</td>
               <td className="px-3 py-2 text-xs">

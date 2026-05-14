@@ -55,6 +55,8 @@ class ShotOut(BaseModel):
     id: int
     project_id: int
     index: int
+    sequence_number: Optional[int] = None
+    shot_number: Optional[int] = None
     start_tc: str
     end_tc: str
     duration_seconds: float
@@ -71,6 +73,8 @@ class ShotOut(BaseModel):
 
 
 class ShotUpdate(BaseModel):
+    sequence_number: Optional[int] = None
+    shot_number: Optional[int] = None
     shot_size: Optional[str] = None
     camera_movement: Optional[str] = None
     characters: Optional[list[str]] = None

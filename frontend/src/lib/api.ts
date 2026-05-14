@@ -35,6 +35,8 @@ export type Shot = {
   id: number;
   project_id: number;
   index: number;
+  sequence_number: number | null;
+  shot_number: number | null;
   start_tc: string;
   end_tc: string;
   duration_seconds: number;
@@ -49,6 +51,15 @@ export type Shot = {
   fx: string | null;
   notes: string | null;
 };
+
+export function formatShotCode(
+  seq: number | null | undefined,
+  num: number | null | undefined,
+): string {
+  if (seq == null || num == null) return "";
+  const pad = (n: number) => String(n).padStart(4, "0");
+  return `S${pad(seq)}_C${pad(num)}`;
+}
 
 export type Me = {
   id: number;

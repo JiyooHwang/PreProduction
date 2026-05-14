@@ -51,6 +51,9 @@ def _apply_lightweight_migrations() -> None:
         # 캐릭터 라이브러리 인덱스 (create_all 이 인덱스도 만들지만 안전망)
         "CREATE INDEX IF NOT EXISTS ix_character_designs_owner_id ON character_designs(owner_id)",
         "CREATE INDEX IF NOT EXISTS ix_character_designs_name ON character_designs(name)",
+        # 샷 시퀀스/샷 번호 (production code, 4자리 표시)
+        "ALTER TABLE shots ADD COLUMN IF NOT EXISTS sequence_number INTEGER",
+        "ALTER TABLE shots ADD COLUMN IF NOT EXISTS shot_number INTEGER",
     ]
     with engine.begin() as conn:
         for stmt in statements:

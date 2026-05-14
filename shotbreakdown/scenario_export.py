@@ -108,6 +108,7 @@ def _make_sheet(wb: Workbook, name: str, headers: list[str], rows: list[list], w
 
 SHOT_HEADERS = [
     "샷#",
+    "코드",
     "씬",
     "샷사이즈",
     "카메라무빙",
@@ -119,8 +120,8 @@ SHOT_HEADERS = [
     "비고",
     "스토리보드",
 ]
-SHOT_WIDTHS = [6, 8, 10, 12, 22, 18, 30, 26, 18, 22, 28]
-SHOT_THUMB_COL = 11
+SHOT_WIDTHS = [6, 16, 8, 10, 12, 22, 18, 30, 26, 18, 22, 28]
+SHOT_THUMB_COL = 12
 SHOT_THUMB_W = 200
 SHOT_THUMB_H = 113  # 16:9
 SHOT_ROW_HEIGHT = 90
@@ -142,8 +143,12 @@ def _make_shots_sheet(wb: Workbook, shots: list, storyboard_dir: Path | None) ->
     for i, shot in enumerate(shots):
         chars = shot.get("characters") or []
         chars_str = ", ".join(chars) if isinstance(chars, list) else str(chars)
+        seq = shot.get("sequence_number")
+        sn = shot.get("shot_number")
+        code = f"S{seq:04d}_C{sn:04d}" if isinstance(seq, int) and isinstance(sn, int) else ""
         row = [
             i + 1,
+            code,
             shot.get("scene_number", ""),
             shot.get("shot_size", ""),
             shot.get("camera_movement", ""),

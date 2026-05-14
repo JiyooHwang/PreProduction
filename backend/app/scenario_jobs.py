@@ -9,6 +9,7 @@ from queue import Queue
 from sqlalchemy.orm import Session
 
 from shotbreakdown.image_gen import ReferenceImage, build_prompt, generate_image
+from shotbreakdown.models import assign_shot_codes
 from shotbreakdown.scenario import analyze_scenario
 
 from .config import settings
@@ -278,7 +279,10 @@ def _run(scenario_id: int) -> None:
         sc.locations = result.get("locations") or []
         sc.props = result.get("props") or []
         sc.fx = result.get("fx") or []
-        sc.shots = result.get("shots") or []
+        shots_list = result.get("shots") or []
+        # scene_number 기반으로 시퀀스/샷 번호 자동 채번 (in-place)
+        assign_shot_codes(shots_list)
+        sc.shots = shots_list
         sc.dialogues = result.get("dialogues") or []
         sc.status = JobStatus.DONE.value
         sc.finished_at = datetime.utcnow()

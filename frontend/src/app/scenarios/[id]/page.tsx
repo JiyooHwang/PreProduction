@@ -328,6 +328,7 @@ function formatVal(v: any): string {
 }
 
 const SHOT_KEYS = [
+  "code",
   "scene_number",
   "shot_size",
   "camera_movement",
@@ -338,6 +339,14 @@ const SHOT_KEYS = [
   "fx",
   "notes",
 ];
+
+function shotCode(shot: any): string {
+  const seq = shot?.sequence_number;
+  const num = shot?.shot_number;
+  if (seq == null || num == null) return "";
+  const pad = (n: number) => String(n).padStart(4, "0");
+  return `S${pad(seq)}_C${pad(num)}`;
+}
 
 function ShotsSection({
   items,
@@ -415,7 +424,11 @@ function ShotsSection({
                   </td>
                   {SHOT_KEYS.map((k) => (
                     <td key={k} className="px-3 py-2 align-top">
-                      {formatVal(it[k])}
+                      {k === "code" ? (
+                        <span className="font-mono text-xs">{shotCode(it)}</span>
+                      ) : (
+                        formatVal(it[k])
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -439,8 +452,13 @@ function ShotsSection({
                 </div>
               )}
               <div className="p-3">
-                <div className="font-semibold mb-1">샷 #{i + 1}</div>
-                {SHOT_KEYS.map((k) => {
+                <div className="font-semibold mb-1 flex items-center justify-between">
+                  <span>샷 #{i + 1}</span>
+                  {shotCode(it) && (
+                    <span className="font-mono text-xs text-slate-500">{shotCode(it)}</span>
+                  )}
+                </div>
+                {SHOT_KEYS.filter((k) => k !== "code").map((k) => {
                   const val = it[k];
                   if (val === undefined || val === null || val === "") return null;
                   return (

@@ -8,7 +8,7 @@ from typing import Callable, Optional
 
 from .detect import detect_shots
 from .extract import ensure_ffmpeg, extract_frame
-from .models import Shot
+from .models import Shot, assign_shot_codes
 from .providers.base import CharacterRef, VisionProvider
 from .timecode import seconds_to_tc
 
@@ -116,6 +116,9 @@ def build_shot_list(
                 analysis=analysis,
             )
         )
+
+    # 자동 시퀀스/샷 번호 채번 (영상은 scene 경계 미상이라 sequence=10, shot 만 10씩 증가)
+    assign_shot_codes(shots)
 
     if on_progress:
         on_progress(total, total, "완료")

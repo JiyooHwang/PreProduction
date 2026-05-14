@@ -9,11 +9,12 @@ from openpyxl.drawing.image import Image as XLImage
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
-from .models import Shot, ShotAnalysis
+from .models import Shot, ShotAnalysis, format_shot_code
 
 
 HEADERS = [
     "컷#",
+    "코드",
     "시작 TC",
     "끝 TC",
     "길이(초)",
@@ -29,8 +30,8 @@ HEADERS = [
     "비고",
 ]
 
-COLUMN_WIDTHS = [6, 14, 14, 9, 11, 22, 10, 14, 26, 28, 32, 26, 18, 22]
-THUMB_COL_INDEX = 6  # F열 (1-base)
+COLUMN_WIDTHS = [6, 16, 14, 14, 9, 11, 22, 10, 14, 26, 28, 32, 26, 18, 22]
+THUMB_COL_INDEX = 7  # G열 (1-base, "코드" 컬럼이 앞에 추가됨)
 THUMB_WIDTH_PX = 140
 THUMB_HEIGHT_PX = 80
 ROW_HEIGHT_PT = 64
@@ -64,6 +65,7 @@ def export_excel(shots: list[Shot], output_path: Path) -> Path:
         a = shot.analysis or ShotAnalysis()
         row = [
             shot.index,
+            format_shot_code(shot.sequence_number, shot.shot_number),
             shot.start_tc,
             shot.end_tc,
             f"{shot.duration_seconds:.2f}",
@@ -108,6 +110,7 @@ def export_csv(shots: list[Shot], output_path: Path) -> Path:
             writer.writerow(
                 [
                     shot.index,
+                    format_shot_code(shot.sequence_number, shot.shot_number),
                     shot.start_tc,
                     shot.end_tc,
                     f"{shot.duration_seconds:.2f}",

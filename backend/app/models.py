@@ -87,6 +87,10 @@ class Shot(Base):
     duration_frames: Mapped[int] = mapped_column(Integer)
     thumbnail_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
+    # 시퀀스/샷 번호 (4자리 표시, 10단위 증가 — 사이에 끼워넣기 가능)
+    sequence_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    shot_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+
     shot_size: Mapped[str | None] = mapped_column(String(16), nullable=True)
     camera_movement: Mapped[str | None] = mapped_column(String(64), nullable=True)
     characters: Mapped[list[str] | None] = mapped_column(JSON, nullable=True)
