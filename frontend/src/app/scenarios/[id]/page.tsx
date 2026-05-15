@@ -166,10 +166,30 @@ export default function ScenarioDetailPage() {
               </button>
             </div>
 
-            <Section title="캐릭터" items={sc.characters} keys={["name", "description", "notes"]} view={view} />
-            <Section title="장소" items={sc.locations} keys={["name", "time_of_day", "description"]} view={view} />
-            <Section title="소품/에셋" items={sc.props} keys={["name", "description"]} view={view} />
-            <Section title="특수효과 (FX)" items={sc.fx} keys={["name", "description"]} view={view} />
+            <Section
+              title="캐릭터"
+              items={sc.characters}
+              keys={["name", "category", "description", "notes", "appearance_count", "shot_codes"]}
+              view={view}
+            />
+            <Section
+              title="장소"
+              items={sc.locations}
+              keys={["name", "category", "time_of_day", "description", "appearance_count", "shot_codes"]}
+              view={view}
+            />
+            <Section
+              title="소품/에셋"
+              items={sc.props}
+              keys={["name", "category", "description", "appearance_count", "shot_codes"]}
+              view={view}
+            />
+            <Section
+              title="특수효과 (FX)"
+              items={sc.fx}
+              keys={["name", "category", "description", "appearance_count", "shot_codes"]}
+              view={view}
+            />
             <ShotsSection
               items={sc.shots}
               view={view}
@@ -332,8 +352,14 @@ const SHOT_KEYS = [
   "scene_number",
   "shot_size",
   "camera_movement",
+  "camera_angle",
+  "lens_mm",
+  "time_of_day",
+  "lighting",
   "characters",
   "location",
+  "props_used",
+  "fx_used",
   "action",
   "dialogue",
   "fx",

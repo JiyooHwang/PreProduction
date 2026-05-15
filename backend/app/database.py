@@ -54,6 +54,13 @@ def _apply_lightweight_migrations() -> None:
         # 샷 시퀀스/샷 번호 (production code, 4자리 표시)
         "ALTER TABLE shots ADD COLUMN IF NOT EXISTS sequence_number INTEGER",
         "ALTER TABLE shots ADD COLUMN IF NOT EXISTS shot_number INTEGER",
+        # 샷 브렉다운 강화 필드
+        "ALTER TABLE shots ADD COLUMN IF NOT EXISTS camera_angle VARCHAR(64)",
+        "ALTER TABLE shots ADD COLUMN IF NOT EXISTS lens_mm VARCHAR(32)",
+        "ALTER TABLE shots ADD COLUMN IF NOT EXISTS time_of_day VARCHAR(32)",
+        "ALTER TABLE shots ADD COLUMN IF NOT EXISTS lighting TEXT",
+        "ALTER TABLE shots ADD COLUMN IF NOT EXISTS props_used JSON",
+        "ALTER TABLE shots ADD COLUMN IF NOT EXISTS fx_used JSON",
     ]
     with engine.begin() as conn:
         for stmt in statements:

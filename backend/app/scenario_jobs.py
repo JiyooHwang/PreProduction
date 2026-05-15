@@ -9,7 +9,7 @@ from queue import Queue
 from sqlalchemy.orm import Session
 
 from shotbreakdown.image_gen import ReferenceImage, build_prompt, generate_image
-from shotbreakdown.models import assign_shot_codes
+from shotbreakdown.models import assign_shot_codes, compute_asset_usage
 from shotbreakdown.scenario import analyze_scenario
 
 from .config import settings
@@ -275,13 +275,25 @@ def _run(scenario_id: int) -> None:
         if sc.status == JobStatus.FAILED.value and "중단" in (sc.error or ""):
             return
 
-        sc.characters = result.get("characters") or []
-        sc.locations = result.get("locations") or []
-        sc.props = result.get("props") or []
-        sc.fx = result.get("fx") or []
+        chars_list = result.get("characters") or []
+        locs_list = result.get("locations") or []
+        props_list = result.get("props") or []
+        fx_list = result.get("fx") or []
         shots_list = result.get("shots") or []
+
         # scene_number 기반으로 시퀀스/샷 번호 자동 채번 (in-place)
         assign_shot_codes(shots_list)
+
+        # 에셋별 등장 빈도 + 샷 코드 리스트 자동 집계
+        compute_asset_usage(chars_list, shots_list, shot_field="characters")
+        compute_asset_usage(locs_list, shots_list, shot_field="location")
+        compute_asset_usage(props_list, shots_list, shot_field="props_used")
+        compute_asset_usage(fx_list, shots_list, shot_field="fx_used")
+
+        sc.characters = chars_list
+        sc.locations = locs_list
+        sc.props = props_list
+        sc.fx = fx_list
         sc.shots = shots_list
         sc.dialogues = result.get("dialogues") or []
         sc.status = JobStatus.DONE.value

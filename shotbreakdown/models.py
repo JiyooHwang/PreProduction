@@ -12,8 +12,14 @@ class ShotAnalysis(BaseModel):
 
     shot_size: Optional[str] = Field(None, description="ECU/CU/MCU/MS/MLS/LS/ELS")
     camera_movement: Optional[str] = Field(None, description="FIX/PAN/TRACK/ZOOM/TILT 등")
+    camera_angle: Optional[str] = Field(None, description="EYE LEVEL/HIGH/LOW/BIRD'S EYE 등")
+    lens_mm: Optional[str] = Field(None, description="wide / normal / tele 추정")
+    time_of_day: Optional[str] = Field(None, description="dawn / morning / day / sunset / evening / night")
+    lighting: Optional[str] = Field(None, description="조명 무드 (자유 텍스트)")
     characters: list[str] = Field(default_factory=list)
     background: Optional[str] = None
+    props_used: list[str] = Field(default_factory=list)
+    fx_used: list[str] = Field(default_factory=list)
     action: Optional[str] = None
     fx: Optional[str] = None
     notes: Optional[str] = None
@@ -47,6 +53,58 @@ def format_shot_code(sequence_number: Optional[int], shot_number: Optional[int])
     if sequence_number is None or shot_number is None:
         return ""
     return f"S{sequence_number:04d}_C{shot_number:04d}"
+
+
+def compute_asset_usage(
+    assets: list[dict],
+    shots: list[dict],
+    *,
+    shot_field: str,
+    name_key: str = "name",
+) -> None:
+    """에셋 리스트에 등장 빈도와 등장 샷 코드 리스트를 in-place 로 채움.
+
+    각 에셋 dict 에 다음 필드 추가:
+    - appearance_count: int  (등장한 샷 수)
+    - shot_codes: list[str]  ['S0010_C0010', 'S0010_C0020', ...]
+
+    shot_field: 샷 dict 에서 이름들을 가져올 키.
+      - 'characters' (list of strings)
+      - 'location' (string, 단일)
+      - 'props_used' (list)
+      - 'fx_used' (list)
+    """
+    if not assets:
+        return
+
+    # 이름(lower) → 등장 샷 코드 리스트
+    usage: dict[str, list[str]] = {}
+    for sh in shots:
+        seq = sh.get("sequence_number")
+        sn = sh.get("shot_number")
+        code = (
+            f"S{seq:04d}_C{sn:04d}"
+            if isinstance(seq, int) and isinstance(sn, int)
+            else ""
+        )
+        if not code:
+            continue
+        val = sh.get(shot_field)
+        if val is None:
+            continue
+        names: list[str] = []
+        if isinstance(val, list):
+            names = [str(x).strip() for x in val if x]
+        elif isinstance(val, str) and val.strip():
+            names = [val.strip()]
+        for n in names:
+            usage.setdefault(n.lower(), []).append(code)
+
+    for asset in assets:
+        name = str(asset.get(name_key) or "").strip()
+        codes = usage.get(name.lower(), [])
+        asset["appearance_count"] = len(codes)
+        asset["shot_codes"] = codes
 
 
 def assign_shot_codes(

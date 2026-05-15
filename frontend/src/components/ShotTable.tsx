@@ -10,14 +10,20 @@ const FIELDS: {
   width: string;
   multiline?: boolean;
 }[] = [
-  { key: "shot_size", label: "샷사이즈", width: "w-24" },
-  { key: "camera_movement", label: "카메라 무빙", width: "w-32" },
-  { key: "characters", label: "캐릭터", width: "w-48", multiline: true },
-  { key: "background", label: "배경", width: "w-56", multiline: true },
-  { key: "action", label: "액션/연기", width: "w-64", multiline: true },
-  { key: "dialogue", label: "대사", width: "w-56", multiline: true },
-  { key: "fx", label: "FX", width: "w-32", multiline: true },
-  { key: "notes", label: "비고", width: "w-40", multiline: true },
+  { key: "shot_size", label: "샷사이즈", width: "w-20" },
+  { key: "camera_movement", label: "카메라 무빙", width: "w-28" },
+  { key: "camera_angle", label: "앵글", width: "w-28" },
+  { key: "lens_mm", label: "렌즈", width: "w-20" },
+  { key: "time_of_day", label: "시간대", width: "w-20" },
+  { key: "lighting", label: "조명", width: "w-40", multiline: true },
+  { key: "characters", label: "캐릭터", width: "w-40", multiline: true },
+  { key: "background", label: "배경", width: "w-48", multiline: true },
+  { key: "props_used", label: "소품", width: "w-32", multiline: true },
+  { key: "fx_used", label: "FX(사용)", width: "w-32", multiline: true },
+  { key: "action", label: "액션/연기", width: "w-56", multiline: true },
+  { key: "dialogue", label: "대사", width: "w-48", multiline: true },
+  { key: "fx", label: "FX", width: "w-28", multiline: true },
+  { key: "notes", label: "비고", width: "w-36", multiline: true },
 ];
 
 export function ShotTable({
@@ -121,7 +127,9 @@ function EditableCell({
     if (value === initial) return;
     setSaving(true);
     try {
-      const parsed = field === "characters" ? splitChars(value) : value || null;
+      const isArrayField =
+        field === "characters" || field === "props_used" || field === "fx_used";
+      const parsed = isArrayField ? splitChars(value) : value || null;
       await onSave(shot, field, parsed);
     } finally {
       setSaving(false);

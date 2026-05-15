@@ -33,36 +33,74 @@ def export_scenario_excel(
     _make_sheet(
         wb,
         "캐릭터",
-        ["이름", "묘사", "비고"],
-        [[c.get("name", ""), c.get("description", ""), c.get("notes", "")] for c in (characters or [])],
-        widths=[20, 40, 30],
+        ["이름", "분류", "묘사", "비고", "등장 샷 수", "등장 샷 코드"],
+        [
+            [
+                c.get("name", ""),
+                c.get("category", ""),
+                c.get("description", ""),
+                c.get("notes", ""),
+                c.get("appearance_count", 0),
+                ", ".join(c.get("shot_codes", []) or []),
+            ]
+            for c in (characters or [])
+        ],
+        widths=[20, 14, 40, 24, 10, 40],
     )
 
     # ── 장소 ──────────────────────────────────────────
     _make_sheet(
         wb,
         "장소",
-        ["이름", "시간대", "묘사"],
-        [[l.get("name", ""), l.get("time_of_day", ""), l.get("description", "")] for l in (locations or [])],
-        widths=[20, 14, 50],
+        ["이름", "분류", "시간대", "묘사", "등장 샷 수", "등장 샷 코드"],
+        [
+            [
+                l.get("name", ""),
+                l.get("category", ""),
+                l.get("time_of_day", ""),
+                l.get("description", ""),
+                l.get("appearance_count", 0),
+                ", ".join(l.get("shot_codes", []) or []),
+            ]
+            for l in (locations or [])
+        ],
+        widths=[20, 12, 14, 40, 10, 40],
     )
 
     # ── 소품/에셋 ─────────────────────────────────────
     _make_sheet(
         wb,
         "소품_에셋",
-        ["이름", "묘사"],
-        [[p.get("name", ""), p.get("description", "")] for p in (props or [])],
-        widths=[20, 50],
+        ["이름", "분류", "묘사", "등장 샷 수", "등장 샷 코드"],
+        [
+            [
+                p.get("name", ""),
+                p.get("category", ""),
+                p.get("description", ""),
+                p.get("appearance_count", 0),
+                ", ".join(p.get("shot_codes", []) or []),
+            ]
+            for p in (props or [])
+        ],
+        widths=[20, 14, 40, 10, 40],
     )
 
     # ── FX ────────────────────────────────────────────
     _make_sheet(
         wb,
         "FX",
-        ["이름", "묘사"],
-        [[f.get("name", ""), f.get("description", "")] for f in (fx or [])],
-        widths=[20, 50],
+        ["이름", "분류", "묘사", "등장 샷 수", "등장 샷 코드"],
+        [
+            [
+                f.get("name", ""),
+                f.get("category", ""),
+                f.get("description", ""),
+                f.get("appearance_count", 0),
+                ", ".join(f.get("shot_codes", []) or []),
+            ]
+            for f in (fx or [])
+        ],
+        widths=[20, 14, 40, 10, 40],
     )
 
     # ── 샷 리스트 (스토리보드 이미지 포함) ────────────
@@ -112,16 +150,22 @@ SHOT_HEADERS = [
     "씬",
     "샷사이즈",
     "카메라무빙",
+    "카메라앵글",
+    "렌즈",
+    "시간대",
+    "조명",
     "캐릭터",
     "장소",
+    "소품",
+    "FX(사용)",
     "액션/연기",
     "대사",
     "FX",
     "비고",
     "스토리보드",
 ]
-SHOT_WIDTHS = [6, 16, 8, 10, 12, 22, 18, 30, 26, 18, 22, 28]
-SHOT_THUMB_COL = 12
+SHOT_WIDTHS = [6, 16, 8, 10, 12, 14, 10, 10, 20, 22, 18, 20, 20, 30, 26, 18, 22, 28]
+SHOT_THUMB_COL = 18
 SHOT_THUMB_W = 200
 SHOT_THUMB_H = 113  # 16:9
 SHOT_ROW_HEIGHT = 90
@@ -143,6 +187,10 @@ def _make_shots_sheet(wb: Workbook, shots: list, storyboard_dir: Path | None) ->
     for i, shot in enumerate(shots):
         chars = shot.get("characters") or []
         chars_str = ", ".join(chars) if isinstance(chars, list) else str(chars)
+        props_used = shot.get("props_used") or []
+        props_str = ", ".join(props_used) if isinstance(props_used, list) else str(props_used)
+        fx_used = shot.get("fx_used") or []
+        fx_used_str = ", ".join(fx_used) if isinstance(fx_used, list) else str(fx_used)
         seq = shot.get("sequence_number")
         sn = shot.get("shot_number")
         code = f"S{seq:04d}_C{sn:04d}" if isinstance(seq, int) and isinstance(sn, int) else ""
@@ -152,8 +200,14 @@ def _make_shots_sheet(wb: Workbook, shots: list, storyboard_dir: Path | None) ->
             shot.get("scene_number", ""),
             shot.get("shot_size", ""),
             shot.get("camera_movement", ""),
+            shot.get("camera_angle", ""),
+            shot.get("lens_mm", ""),
+            shot.get("time_of_day", ""),
+            shot.get("lighting", ""),
             chars_str,
             shot.get("location", ""),
+            props_str,
+            fx_used_str,
             shot.get("action", ""),
             shot.get("dialogue", "") or "",
             shot.get("fx", "") or "",

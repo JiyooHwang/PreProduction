@@ -22,15 +22,21 @@ HEADERS = [
     "썸네일",
     "샷사이즈",
     "카메라 무빙",
+    "카메라 앵글",
+    "렌즈",
+    "시간대",
+    "조명",
     "캐릭터",
     "배경",
+    "소품",
+    "FX(사용)",
     "액션/연기",
     "대사",
     "FX",
     "비고",
 ]
 
-COLUMN_WIDTHS = [6, 16, 14, 14, 9, 11, 22, 10, 14, 26, 28, 32, 26, 18, 22]
+COLUMN_WIDTHS = [6, 16, 14, 14, 9, 11, 22, 10, 14, 14, 10, 10, 20, 26, 28, 22, 22, 32, 26, 18, 22]
 THUMB_COL_INDEX = 7  # G열 (1-base, "코드" 컬럼이 앞에 추가됨)
 THUMB_WIDTH_PX = 140
 THUMB_HEIGHT_PX = 80
@@ -73,8 +79,14 @@ def export_excel(shots: list[Shot], output_path: Path) -> Path:
             "",  # 썸네일 셀 (이미지로 채워짐)
             a.shot_size or "",
             a.camera_movement or "",
+            a.camera_angle or "",
+            a.lens_mm or "",
+            a.time_of_day or "",
+            a.lighting or "",
             ", ".join(a.characters or []),
             a.background or "",
+            ", ".join(a.props_used or []),
+            ", ".join(a.fx_used or []),
             a.action or "",
             shot.dialogue or "",
             a.fx or "",
@@ -118,8 +130,14 @@ def export_csv(shots: list[Shot], output_path: Path) -> Path:
                     "",
                     a.shot_size or "",
                     a.camera_movement or "",
+                    a.camera_angle or "",
+                    a.lens_mm or "",
+                    a.time_of_day or "",
+                    a.lighting or "",
                     ", ".join(a.characters or []),
                     a.background or "",
+                    ", ".join(a.props_used or []),
+                    ", ".join(a.fx_used or []),
                     a.action or "",
                     shot.dialogue or "",
                     a.fx or "",

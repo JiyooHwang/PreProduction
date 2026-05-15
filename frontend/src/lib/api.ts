@@ -44,8 +44,14 @@ export type Shot = {
   thumbnail_path: string | null;
   shot_size: string | null;
   camera_movement: string | null;
+  camera_angle: string | null;
+  lens_mm: string | null;
+  time_of_day: string | null;
+  lighting: string | null;
   characters: string[] | null;
   background: string | null;
+  props_used: string[] | null;
+  fx_used: string[] | null;
   action: string | null;
   dialogue: string | null;
   fx: string | null;
