@@ -15,11 +15,12 @@ from shotbreakdown.models import Shot as CoreShot
 from shotbreakdown.models import ShotAnalysis as CoreAnalysis
 
 from ..auth import get_current_user
+from ..budget import aggregate_project_assets, calculate as calculate_budget
 from ..config import settings
 from ..database import get_db
 from ..jobs import enqueue
 from ..models import Job, JobStatus, Project, Shot, User
-from ..schemas import JobOut, ProjectCreate, ProjectOut
+from ..schemas import JobOut, ProjectCreate, ProjectOut, ScenarioBudgetIn
 
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -41,6 +42,7 @@ def _to_project_out(project: Project, db: Session) -> ProjectOut:
         owner_email=project.owner.email if project.owner else None,
         shot_count=shot_count,
         latest_job_status=latest_job.status if latest_job else None,
+        budget=project.budget,
     )
 
 
@@ -346,3 +348,73 @@ def get_thumbnail(
     if not path.exists():
         raise HTTPException(status_code=404, detail="파일 없음")
     return FileResponse(path, media_type="image/jpeg")
+
+
+@router.put("/{project_id}/budget", response_model=ProjectOut)
+def set_project_budget(
+    project_id: int,
+    payload: ScenarioBudgetIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ProjectOut:
+    project = _get_project_or_404(project_id, db)
+    if payload.budget is None:
+        project.budget = None
+    else:
+        if payload.budget < 0:
+            raise HTTPException(status_code=400, detail="예산은 0 이상이어야 합니다.")
+        project.budget = float(payload.budget)
+    db.commit()
+    db.refresh(project)
+    return _to_project_out(project, db)
+
+
+@router.get("/{project_id}/budget-analysis")
+def get_project_budget_analysis(
+    project_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """프로젝트(영상 분석)의 예산 분석.
+
+    1) 샷에서 캐릭터/소품/FX 자동 집계
+    2) 사용자 임계값으로 등급 자동 분류
+    3) 단가 곱해서 비용 계산 + 예산 대비 제안
+    """
+    from shotbreakdown.models import (
+        compute_asset_grades,
+        compute_character_grades,
+    )
+
+    project = _get_project_or_404(project_id, db)
+    shots_db = (
+        db.query(Shot)
+        .filter(Shot.project_id == project_id)
+        .order_by(Shot.index)
+        .all()
+    )
+
+    aggregated = aggregate_project_assets(shots_db)
+    total_shots = len(shots_db)
+
+    # 사용자 임계값 적용해서 등급 자동 분류
+    from ..scenario_jobs import _user_grade_thresholds
+
+    thresholds = _user_grade_thresholds(user)
+    compute_character_grades(aggregated["characters"], total_shots, thresholds=thresholds)
+    compute_asset_grades(aggregated["props"], total_shots, thresholds=thresholds)
+    compute_asset_grades(aggregated["fx"], total_shots, thresholds=thresholds)
+
+    analysis = calculate_budget(
+        characters=aggregated["characters"],
+        locations=aggregated["locations"],
+        props=aggregated["props"],
+        fx=aggregated["fx"],
+        shots=[{} for _ in shots_db],  # 샷 수만 필요
+        prices=user.unit_prices or {},
+        budget=project.budget,
+    )
+
+    # 분석 결과에 집계된 에셋 리스트도 함께 반환 (UI 표시용)
+    analysis["assets"] = aggregated
+    return analysis

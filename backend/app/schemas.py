@@ -59,6 +59,7 @@ class ProjectOut(BaseModel):
     owner_email: Optional[str] = None
     shot_count: int = 0
     latest_job_status: Optional[str] = None
+    budget: Optional[float] = None
 
 
 class JobOut(BaseModel):

@@ -12,6 +12,66 @@ ASSET_TYPES = ("characters", "locations", "props", "fx")
 GRADES = ("S", "AA", "A", "C")
 
 
+def aggregate_project_assets(shots: list) -> dict:
+    """영상 프로젝트의 샷 리스트에서 에셋 (캐릭터/소품/FX) 집계.
+
+    각 샷의 characters, props_used, fx_used 를 모아 unique name 별로
+    appearance_count + shot_codes 계산.
+
+    locations 는 영상에서 'background' 가 자유 텍스트 묘사라 자동 집계 어려움.
+    여기서는 빈 리스트 반환 (필요 시 사용자가 수동 입력하는 방향).
+
+    반환: {
+      "characters": [{name, appearance_count, shot_codes}, ...],
+      "locations":  [],
+      "props":      [...],
+      "fx":         [...],
+    }
+    """
+    def _shot_code(sh) -> str:
+        seq = getattr(sh, "sequence_number", None)
+        sn = getattr(sh, "shot_number", None)
+        if isinstance(seq, int) and isinstance(sn, int):
+            return f"S{seq:04d}_C{sn:04d}"
+        return ""
+
+    def _aggregate(field: str) -> list[dict]:
+        bucket: dict[str, dict] = {}  # name_lower → {name, codes}
+        for sh in shots:
+            val = getattr(sh, field, None)
+            if not val:
+                continue
+            names: list[str] = []
+            if isinstance(val, list):
+                names = [str(x).strip() for x in val if x]
+            elif isinstance(val, str) and val.strip():
+                names = [val.strip()]
+            code = _shot_code(sh)
+            for n in names:
+                key = n.lower()
+                entry = bucket.setdefault(key, {"name": n, "shot_codes": []})
+                if code:
+                    entry["shot_codes"].append(code)
+        out = []
+        for key, e in bucket.items():
+            codes = e["shot_codes"]
+            out.append({
+                "name": e["name"],
+                "appearance_count": len(codes),
+                "shot_codes": codes,
+            })
+        # 등장 빈도 내림차순
+        out.sort(key=lambda x: x["appearance_count"], reverse=True)
+        return out
+
+    return {
+        "characters": _aggregate("characters"),
+        "locations": [],  # 영상은 background 자유 텍스트라 자동 집계 안 함
+        "props": _aggregate("props_used"),
+        "fx": _aggregate("fx_used"),
+    }
+
+
 # 단가 기본값 (사용자가 미설정 시). 단위: 원
 DEFAULT_UNIT_PRICES: dict = {
     "currency": "KRW",

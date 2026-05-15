@@ -3,12 +3,13 @@
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 import { Header } from "@/components/Header";
 import { UploadForm } from "@/components/UploadForm";
 import { JobProgress } from "@/components/JobProgress";
 import { ShotTable } from "@/components/ShotTable";
+import { ProjectBudgetCard } from "@/components/ProjectBudgetCard";
 import { useApi } from "@/lib/api";
 
 export default function ProjectDetailPage() {
@@ -73,6 +74,14 @@ export default function ProjectDetailPage() {
         />
 
         <JobProgress job={job ?? null} projectId={id} onCancelled={() => refreshJob()} />
+
+        {project && shots && shots.length > 0 && (
+          <ProjectBudgetCard
+            projectId={id}
+            project={project}
+            shotsCount={shots.length}
+          />
+        )}
 
         <ShotTable
           projectId={id}

@@ -66,6 +66,7 @@ def _apply_lightweight_migrations() -> None:
         # 예산 / 단가 (예산 제안 시스템)
         "ALTER TABLE users ADD COLUMN IF NOT EXISTS unit_prices JSON",
         "ALTER TABLE scenarios ADD COLUMN IF NOT EXISTS budget DOUBLE PRECISION",
+        "ALTER TABLE projects ADD COLUMN IF NOT EXISTS budget DOUBLE PRECISION",
     ]
     with engine.begin() as conn:
         for stmt in statements:

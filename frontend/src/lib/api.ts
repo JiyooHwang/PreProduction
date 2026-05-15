@@ -16,6 +16,16 @@ export type Project = {
   owner_email: string | null;
   shot_count: number;
   latest_job_status: string | null;
+  budget: number | null;
+};
+
+export type ProjectBudgetAnalysis = BudgetAnalysis & {
+  assets: {
+    characters: { name: string; appearance_count: number; shot_codes: string[]; grade?: string }[];
+    locations: { name: string; appearance_count: number; shot_codes: string[]; grade?: string }[];
+    props: { name: string; appearance_count: number; shot_codes: string[]; grade?: string }[];
+    fx: { name: string; appearance_count: number; shot_codes: string[]; grade?: string }[];
+  };
 };
 
 export type Job = {
@@ -189,6 +199,22 @@ export function useApi() {
     scenarioBudgetAnalysis: (id: number, config?: SWRConfiguration) =>
       useSWR<BudgetAnalysis>(
         token && id ? `/api/scenarios/${id}/budget-analysis` : null,
+        fetcher,
+        config,
+      ),
+
+    setProjectBudget: async (projectId: number, budget: number | null) =>
+      (
+        await request(token, `/api/projects/${projectId}/budget`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ budget }),
+        })
+      ).json() as Promise<Project>,
+
+    projectBudgetAnalysis: (id: number, config?: SWRConfiguration) =>
+      useSWR<ProjectBudgetAnalysis>(
+        token && id ? `/api/projects/${id}/budget-analysis` : null,
         fetcher,
         config,
       ),
