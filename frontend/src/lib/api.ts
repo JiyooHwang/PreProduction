@@ -219,6 +219,42 @@ export function useApi() {
         config,
       ),
 
+    mergeProjectAssets: async (
+      projectId: number,
+      assetType: "characters" | "props" | "fx",
+      sourceNames: string[],
+      targetName: string,
+    ) =>
+      (
+        await request(token, `/api/projects/${projectId}/merge-assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            asset_type: assetType,
+            source_names: sourceNames,
+            target_name: targetName,
+          }),
+        })
+      ).json() as Promise<{ ok: boolean; affected_shots: number; merged: number; target: string }>,
+
+    mergeScenarioAssets: async (
+      scenarioId: number,
+      assetType: "characters" | "locations" | "props" | "fx",
+      sourceNames: string[],
+      targetName: string,
+    ) =>
+      (
+        await request(token, `/api/scenarios/${scenarioId}/merge-assets`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            asset_type: assetType,
+            source_names: sourceNames,
+            target_name: targetName,
+          }),
+        })
+      ).json() as Promise<ScenarioOut>,
+
     updateAssetGrade: async (
       scenarioId: number,
       assetType: "characters" | "locations" | "props" | "fx",

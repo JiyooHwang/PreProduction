@@ -247,10 +247,28 @@ export function ProjectBudgetCard({
           </button>
 
           {showAssets && (
-            <div className="mt-3 grid grid-cols-1 md:grid-cols-3 gap-3">
-              <AssetList title="캐릭터" items={analysis.assets.characters} />
-              <AssetList title="소품" items={analysis.assets.props} />
-              <AssetList title="FX" items={analysis.assets.fx} />
+            <div className="mt-3 grid grid-cols-1 gap-3">
+              <MergeableAssetList
+                title="캐릭터"
+                items={analysis.assets.characters}
+                projectId={projectId}
+                assetType="characters"
+                onMerged={() => refresh()}
+              />
+              <MergeableAssetList
+                title="소품"
+                items={analysis.assets.props}
+                projectId={projectId}
+                assetType="props"
+                onMerged={() => refresh()}
+              />
+              <MergeableAssetList
+                title="FX"
+                items={analysis.assets.fx}
+                projectId={projectId}
+                assetType="fx"
+                onMerged={() => refresh()}
+              />
             </div>
           )}
         </>
@@ -260,13 +278,24 @@ export function ProjectBudgetCard({
 }
 
 
-function AssetList({
+function MergeableAssetList({
   title,
   items,
+  projectId,
+  assetType,
+  onMerged,
 }: {
   title: string;
   items: { name: string; appearance_count: number; shot_codes: string[]; grade?: string }[];
+  projectId: number;
+  assetType: "characters" | "props" | "fx";
+  onMerged: () => void;
 }) {
+  const api = useApi();
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [targetName, setTargetName] = useState<string>("");
+  const [merging, setMerging] = useState(false);
+
   if (!items || items.length === 0) {
     return (
       <div className="border border-slate-200 rounded-lg p-3 text-sm">
@@ -275,19 +304,103 @@ function AssetList({
       </div>
     );
   }
+
+  const toggle = (name: string) => {
+    const next = new Set(selected);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    setSelected(next);
+    if (next.size > 0 && !targetName) {
+      // 처음 선택한 이름을 기본 target 으로
+      setTargetName(Array.from(next)[0]);
+    }
+  };
+
+  const doMerge = async () => {
+    if (selected.size < 2) {
+      alert("2개 이상 선택해야 병합 가능합니다.");
+      return;
+    }
+    const target = targetName.trim();
+    if (!target) {
+      alert("통합할 이름을 입력해주세요.");
+      return;
+    }
+    if (!confirm(`${selected.size}개를 '${target}' 으로 통합할까요?`)) return;
+
+    setMerging(true);
+    try {
+      const sources = Array.from(selected);
+      await api.mergeProjectAssets(projectId, assetType, sources, target);
+      setSelected(new Set());
+      setTargetName("");
+      onMerged();
+    } catch (e: any) {
+      alert("병합 실패: " + (e?.message || e));
+    } finally {
+      setMerging(false);
+    }
+  };
+
   return (
     <div className="border border-slate-200 rounded-lg p-3 text-sm">
-      <div className="font-semibold mb-2">
-        {title} <span className="text-xs text-slate-400">({items.length})</span>
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-semibold">
+          {title} <span className="text-xs text-slate-400">({items.length}명/개)</span>
+        </div>
+        {selected.size >= 2 && (
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={targetName}
+              onChange={(e) => setTargetName(e.target.value)}
+              placeholder="통합 이름"
+              className="border border-slate-300 rounded px-2 py-0.5 text-xs w-32"
+            />
+            <button
+              onClick={doMerge}
+              disabled={merging}
+              className="bg-purple-600 text-white text-xs px-3 py-1 rounded hover:bg-purple-700 disabled:opacity-50"
+            >
+              {merging ? "병합 중..." : `🔗 ${selected.size}개 병합`}
+            </button>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="text-xs text-slate-500 hover:underline"
+            >
+              선택 해제
+            </button>
+          </div>
+        )}
       </div>
-      <ul className="space-y-1">
-        {items.map((it, i) => (
-          <li key={i} className="flex items-center gap-2 text-xs">
-            <GradeBadge grade={it.grade} />
-            <span className="font-medium">{it.name}</span>
-            <span className="text-slate-500 ml-auto">{it.appearance_count}샷</span>
-          </li>
-        ))}
+      {selected.size === 0 && (
+        <div className="text-xs text-slate-500 mb-2">
+          같은 인물/소품/효과를 체크박스로 골라 한 이름으로 통합할 수 있어요.
+        </div>
+      )}
+      <ul className="space-y-1 max-h-96 overflow-y-auto">
+        {items.map((it, i) => {
+          const isSelected = selected.has(it.name);
+          return (
+            <li
+              key={i}
+              className={`flex items-center gap-2 text-xs px-2 py-1 rounded ${
+                isSelected ? "bg-purple-50" : "hover:bg-slate-50"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={isSelected}
+                onChange={() => toggle(it.name)}
+              />
+              <GradeBadge grade={it.grade} />
+              <span className="font-medium">{it.name}</span>
+              <span className="text-slate-500 ml-auto whitespace-nowrap">
+                {it.appearance_count}샷
+              </span>
+            </li>
+          );
+        })}
       </ul>
     </div>
   );

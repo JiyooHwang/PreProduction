@@ -370,6 +370,123 @@ def set_scenario_budget(
     return ScenarioOut.model_validate(sc)
 
 
+_MERGE_FIELD_MAP = {
+    "characters": ("characters", "characters"),  # (scenario field, shot field)
+    "locations":  ("locations",  "location"),
+    "props":      ("props",      "props_used"),
+    "fx":         ("fx",         "fx_used"),
+}
+
+
+@router.post("/{scenario_id}/merge-assets", response_model=ScenarioOut)
+def merge_scenario_assets(
+    scenario_id: int,
+    payload: dict,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ScenarioOut:
+    """시나리오에서 같은 에셋(캐릭터/장소/소품/FX)을 하나로 통합.
+
+    payload:
+    {
+      "asset_type": "characters" | "locations" | "props" | "fx",
+      "source_names": ["A", "B", "C"],
+      "target_name": "수진"
+    }
+    """
+    from shotbreakdown.models import (
+        compute_asset_grades,
+        compute_asset_usage,
+        compute_character_grades,
+    )
+    from ..scenario_jobs import _user_grade_thresholds
+
+    sc = db.get(Scenario, scenario_id)
+    if not sc or sc.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="시나리오를 찾을 수 없습니다.")
+
+    asset_type = payload.get("asset_type")
+    if asset_type not in _MERGE_FIELD_MAP:
+        raise HTTPException(status_code=400, detail=f"asset_type 은 {list(_MERGE_FIELD_MAP)} 중 하나.")
+
+    sources = payload.get("source_names") or []
+    target = (payload.get("target_name") or "").strip()
+    if not isinstance(sources, list) or not sources or not target:
+        raise HTTPException(status_code=400, detail="source_names 와 target_name 필수.")
+
+    src_lower = {str(s).strip().lower() for s in sources if str(s).strip()}
+    if not src_lower:
+        raise HTTPException(status_code=400, detail="유효한 source_names 가 필요.")
+
+    sc_field, shot_field = _MERGE_FIELD_MAP[asset_type]
+
+    # 1) 에셋 리스트 통합 (필드의 dict 리스트)
+    items = list(getattr(sc, sc_field) or [])
+    merged_entry: dict | None = None
+    new_items: list[dict] = []
+    for it in items:
+        if not isinstance(it, dict):
+            continue
+        name = str(it.get("name") or "").strip()
+        if name.lower() in src_lower:
+            if merged_entry is None:
+                merged_entry = dict(it)
+                merged_entry["name"] = target
+                # grade_locked 는 유지하지 않음 (재계산 대상)
+                merged_entry.pop("appearance_count", None)
+                merged_entry.pop("shot_codes", None)
+                merged_entry.pop("grade", None)
+                merged_entry.pop("grade_locked", None)
+                new_items.append(merged_entry)
+            # 그 외 중복 source 는 스킵
+        else:
+            new_items.append(it)
+    setattr(sc, sc_field, new_items)
+
+    # 2) 샷 안의 참조 업데이트
+    new_shots: list[dict] = []
+    for shot in (sc.shots or []):
+        if not isinstance(shot, dict):
+            continue
+        new_shot = dict(shot)
+        val = new_shot.get(shot_field)
+        if isinstance(val, list):
+            replaced: list[str] = []
+            for v in val:
+                vs = str(v).strip()
+                if vs.lower() in src_lower:
+                    if target not in replaced:
+                        replaced.append(target)
+                elif vs not in replaced:
+                    replaced.append(vs)
+            new_shot[shot_field] = replaced
+        elif isinstance(val, str):
+            if val.strip().lower() in src_lower:
+                new_shot[shot_field] = target
+        new_shots.append(new_shot)
+    sc.shots = new_shots
+
+    # 3) 등장 빈도 + 등급 재계산
+    thresholds = _user_grade_thresholds(user)
+    total = len(sc.shots or [])
+    if asset_type == "characters":
+        compute_asset_usage(sc.characters or [], sc.shots or [], shot_field="characters")
+        compute_character_grades(sc.characters or [], total, thresholds=thresholds)
+    elif asset_type == "locations":
+        compute_asset_usage(sc.locations or [], sc.shots or [], shot_field="location")
+        compute_asset_grades(sc.locations or [], total, thresholds=thresholds)
+    elif asset_type == "props":
+        compute_asset_usage(sc.props or [], sc.shots or [], shot_field="props_used")
+        compute_asset_grades(sc.props or [], total, thresholds=thresholds)
+    else:  # fx
+        compute_asset_usage(sc.fx or [], sc.shots or [], shot_field="fx_used")
+        compute_asset_grades(sc.fx or [], total, thresholds=thresholds)
+
+    db.commit()
+    db.refresh(sc)
+    return ScenarioOut.model_validate(sc)
+
+
 @router.get("/{scenario_id}/budget-analysis")
 def get_scenario_budget_analysis(
     scenario_id: int,

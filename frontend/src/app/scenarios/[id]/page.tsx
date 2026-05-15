@@ -543,6 +543,45 @@ function Section({
   assetType?: "characters" | "locations" | "props" | "fx";
   onChanged?: () => void;
 }) {
+  const api = useApi();
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [mergeTarget, setMergeTarget] = useState<string>("");
+  const [merging, setMerging] = useState(false);
+
+  const canMerge = !!scenarioId && !!assetType;
+
+  const toggle = (idx: number, name: string) => {
+    const next = new Set(selected);
+    if (next.has(idx)) next.delete(idx);
+    else next.add(idx);
+    setSelected(next);
+    if (next.size > 0 && !mergeTarget) setMergeTarget(name);
+  };
+
+  const doMerge = async () => {
+    if (!scenarioId || !assetType || selected.size < 2) return;
+    const target = mergeTarget.trim();
+    if (!target) {
+      alert("통합 이름을 입력해주세요.");
+      return;
+    }
+    if (!items) return;
+    if (!confirm(`${selected.size}개를 '${target}' 으로 통합할까요?`)) return;
+
+    setMerging(true);
+    try {
+      const sources = Array.from(selected).map((i) => items[i]?.name).filter(Boolean);
+      await api.mergeScenarioAssets(scenarioId, assetType, sources, target);
+      setSelected(new Set());
+      setMergeTarget("");
+      onChanged?.();
+    } catch (e: any) {
+      alert("병합 실패: " + (e?.message || e));
+    } finally {
+      setMerging(false);
+    }
+  };
+
   if (!items || items.length === 0) {
     return (
       <div className="bg-white rounded-2xl shadow p-5 mb-6">
@@ -553,14 +592,46 @@ function Section({
   }
   return (
     <div className="bg-white rounded-2xl shadow p-5 mb-6">
-      <h2 className="font-semibold mb-3">
-        {title} <span className="text-slate-400 font-normal">({items.length})</span>
-      </h2>
+      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+        <h2 className="font-semibold">
+          {title} <span className="text-slate-400 font-normal">({items.length})</span>
+        </h2>
+        {canMerge && selected.size >= 2 && (
+          <div className="flex items-center gap-2 text-sm">
+            <input
+              type="text"
+              value={mergeTarget}
+              onChange={(e) => setMergeTarget(e.target.value)}
+              placeholder="통합 이름"
+              className="border border-slate-300 rounded px-2 py-1 text-sm w-40"
+            />
+            <button
+              onClick={doMerge}
+              disabled={merging}
+              className="bg-purple-600 text-white text-sm px-3 py-1.5 rounded hover:bg-purple-700 disabled:opacity-50"
+            >
+              {merging ? "병합 중..." : `🔗 ${selected.size}개 병합`}
+            </button>
+            <button
+              onClick={() => setSelected(new Set())}
+              className="text-sm text-slate-500 hover:underline"
+            >
+              선택 해제
+            </button>
+          </div>
+        )}
+      </div>
+      {canMerge && selected.size === 0 && (
+        <div className="text-xs text-slate-500 mb-2">
+          💡 같은 항목 여러 개를 체크박스로 골라 한 이름으로 병합할 수 있습니다.
+        </div>
+      )}
       {view === "table" ? (
         <div className="overflow-x-auto">
           <table className="w-full text-sm border-collapse">
             <thead className="bg-slate-50">
               <tr>
+                {canMerge && <th className="text-left px-3 py-2 font-medium border-b border-slate-200 w-8"></th>}
                 {keys.map((k) => (
                   <th key={k} className="text-left px-3 py-2 font-medium border-b border-slate-200">
                     {k}
@@ -570,7 +641,16 @@ function Section({
             </thead>
             <tbody>
               {items.map((it, i) => (
-                <tr key={i} className="border-b border-slate-100">
+                <tr key={i} className={`border-b border-slate-100 ${selected.has(i) ? "bg-purple-50" : ""}`}>
+                  {canMerge && (
+                    <td className="px-3 py-2 align-top">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(i)}
+                        onChange={() => toggle(i, it.name || "")}
+                      />
+                    </td>
+                  )}
                   {keys.map((k) => (
                     <td key={k} className="px-3 py-2 align-top">
                       {k === "grade" && scenarioId && assetType ? (
@@ -595,7 +675,20 @@ function Section({
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
           {items.map((it, i) => (
-            <div key={i} className="border border-slate-200 rounded-lg p-3 text-sm">
+            <div
+              key={i}
+              className={`border border-slate-200 rounded-lg p-3 text-sm ${selected.has(i) ? "bg-purple-50 border-purple-300" : ""}`}
+            >
+              {canMerge && (
+                <div className="mb-2 flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={selected.has(i)}
+                    onChange={() => toggle(i, it.name || "")}
+                  />
+                  <span className="text-xs text-slate-500">선택해서 병합</span>
+                </div>
+              )}
               {keys.map((k) => {
                 const val = it[k];
                 if (k === "grade" && scenarioId && assetType) {

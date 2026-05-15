@@ -418,3 +418,66 @@ def get_project_budget_analysis(
     # 분석 결과에 집계된 에셋 리스트도 함께 반환 (UI 표시용)
     analysis["assets"] = aggregated
     return analysis
+
+
+@router.post("/{project_id}/merge-assets")
+def merge_project_assets(
+    project_id: int,
+    payload: dict,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """프로젝트(영상)의 샷에서 같은 에셋을 하나로 통합.
+
+    payload:
+    {
+      "asset_type": "characters" | "props" | "fx",
+      "source_names": ["갈색 머리 여자", "긴 머리 여자"],
+      "target_name": "수진"
+    }
+    """
+    project = _get_project_or_404(project_id, db)
+    if project.owner_id != user.id:
+        raise HTTPException(status_code=403, detail="본인 프로젝트만 수정 가능합니다.")
+
+    asset_type = payload.get("asset_type")
+    if asset_type not in ("characters", "props", "fx"):
+        raise HTTPException(status_code=400, detail="asset_type 은 characters / props / fx 중 하나.")
+
+    sources = payload.get("source_names") or []
+    target = (payload.get("target_name") or "").strip()
+    if not isinstance(sources, list) or not sources or not target:
+        raise HTTPException(status_code=400, detail="source_names 와 target_name 필수.")
+
+    src_lower = {str(s).strip().lower() for s in sources if str(s).strip()}
+    if not src_lower:
+        raise HTTPException(status_code=400, detail="유효한 source_names 가 필요.")
+
+    shot_field = {
+        "characters": "characters",
+        "props": "props_used",
+        "fx": "fx_used",
+    }[asset_type]
+
+    shots = db.query(Shot).filter(Shot.project_id == project_id).all()
+    affected = 0
+    for shot in shots:
+        current = getattr(shot, shot_field) or []
+        if not isinstance(current, list):
+            continue
+        new_list: list[str] = []
+        was_merged = False
+        for c in current:
+            cs = str(c).strip()
+            if cs.lower() in src_lower:
+                was_merged = True
+                if target not in new_list:
+                    new_list.append(target)
+            elif cs not in new_list:
+                new_list.append(cs)
+        if was_merged:
+            setattr(shot, shot_field, new_list)
+            affected += 1
+
+    db.commit()
+    return {"ok": True, "affected_shots": affected, "merged": len(src_lower), "target": target}
