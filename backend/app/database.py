@@ -61,6 +61,8 @@ def _apply_lightweight_migrations() -> None:
         "ALTER TABLE shots ADD COLUMN IF NOT EXISTS lighting TEXT",
         "ALTER TABLE shots ADD COLUMN IF NOT EXISTS props_used JSON",
         "ALTER TABLE shots ADD COLUMN IF NOT EXISTS fx_used JSON",
+        # 난이도 등급 임계값 (사용자 설정)
+        "ALTER TABLE users ADD COLUMN IF NOT EXISTS grade_thresholds JSON",
     ]
     with engine.begin() as conn:
         for stmt in statements:

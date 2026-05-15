@@ -73,6 +73,7 @@ export type Me = {
   name: string;
   picture: string | null;
   has_gemini_key: boolean;
+  grade_thresholds: { s: number; aa: number; a: number } | null;
 };
 
 function useToken(): string | null {
@@ -122,6 +123,36 @@ export function useApi() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ api_key: apiKey }),
         })
+      ).json(),
+
+    setGradeThresholds: async (thresholds: { s: number; aa: number; a: number }) =>
+      (
+        await request(token, "/api/me/grade-thresholds", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(thresholds),
+        })
+      ).json() as Promise<Me>,
+
+    resetGradeThresholds: async () =>
+      (await request(token, "/api/me/grade-thresholds", { method: "DELETE" })).json() as Promise<Me>,
+
+    updateAssetGrade: async (
+      scenarioId: number,
+      assetType: "characters" | "locations" | "props" | "fx",
+      assetIndex: number,
+      grade: "S" | "AA" | "A" | "C" | null,
+    ) =>
+      (
+        await request(
+          token,
+          `/api/scenarios/${scenarioId}/assets/${assetType}/${assetIndex}/grade`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ grade }),
+          },
+        )
       ).json(),
 
     createProject: async (title: string, description?: string) =>

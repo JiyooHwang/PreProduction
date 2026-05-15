@@ -19,6 +19,7 @@ from ..config import settings
 from ..database import get_db
 from ..models import CharacterDesign, JobStatus, Scenario, User
 from ..schemas import (
+    AssetGradeIn,
     CharacterDesignOut,
     ScenarioCreate,
     ScenarioListItem,
@@ -274,6 +275,75 @@ def get_shot_prompt(
     if shot_index < 0 or shot_index >= len(shots):
         raise HTTPException(status_code=404, detail="샷 인덱스 범위 밖.")
     return {"prompt": build_prompt(shots[shot_index])}
+
+
+_ASSET_KEYS = {
+    "characters": "characters",
+    "locations": "locations",
+    "props": "props",
+    "fx": "fx",
+}
+_VALID_GRADES = {"S", "AA", "A", "C"}
+
+
+@router.patch("/{scenario_id}/assets/{asset_type}/{asset_index}/grade", response_model=ScenarioOut)
+def update_asset_grade(
+    scenario_id: int,
+    asset_type: str,
+    asset_index: int,
+    payload: AssetGradeIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ScenarioOut:
+    """캐릭터/장소/소품/FX 의 등급 수동 지정.
+
+    asset_type: characters | locations | props | fx
+    payload.grade: 'S' | 'AA' | 'A' | 'C' 또는 null (자동 분류로 되돌림)
+    """
+    if asset_type not in _ASSET_KEYS:
+        raise HTTPException(status_code=400, detail=f"asset_type 은 {list(_ASSET_KEYS)} 중 하나.")
+    sc = db.get(Scenario, scenario_id)
+    if not sc or sc.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="시나리오를 찾을 수 없습니다.")
+
+    field = _ASSET_KEYS[asset_type]
+    items = list(getattr(sc, field) or [])  # 새 리스트로 복사 (JSON dirty tracking 위해)
+    if asset_index < 0 or asset_index >= len(items):
+        raise HTTPException(status_code=404, detail="asset_index 가 범위 밖.")
+
+    grade = (payload.grade or "").strip().upper() or None
+    if grade is not None and grade not in _VALID_GRADES:
+        raise HTTPException(
+            status_code=400, detail=f"grade 는 {sorted(_VALID_GRADES)} 중 하나여야 합니다."
+        )
+
+    item = dict(items[asset_index])
+    if grade is None:
+        # 자동 분류로 되돌림
+        item.pop("grade_locked", None)
+        # 다음 분석 때 재계산되지만, 즉시 보이도록 자동 계산도 한 번 수행
+        from shotbreakdown.models import (
+            compute_asset_grades,
+            compute_character_grades,
+        )
+        from ..scenario_jobs import _user_grade_thresholds
+
+        items[asset_index] = item
+        total = len(sc.shots or [])
+        thresholds = _user_grade_thresholds(user)
+        if asset_type == "characters":
+            compute_character_grades(items, total, thresholds=thresholds)
+        else:
+            compute_asset_grades(items, total, thresholds=thresholds)
+    else:
+        item["grade"] = grade
+        item["grade_locked"] = True
+        items[asset_index] = item
+
+    setattr(sc, field, items)
+    db.commit()
+    db.refresh(sc)
+    return ScenarioOut.model_validate(sc)
 
 
 @router.get("/{scenario_id}/export.xlsx")

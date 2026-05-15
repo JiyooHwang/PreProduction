@@ -9,7 +9,12 @@ from queue import Queue
 from sqlalchemy.orm import Session
 
 from shotbreakdown.image_gen import ReferenceImage, build_prompt, generate_image
-from shotbreakdown.models import assign_shot_codes, compute_asset_usage
+from shotbreakdown.models import (
+    assign_shot_codes,
+    compute_asset_grades,
+    compute_asset_usage,
+    compute_character_grades,
+)
 from shotbreakdown.scenario import analyze_scenario
 
 from .config import settings
@@ -74,6 +79,24 @@ def _storyboard_loop() -> None:
 def storyboard_dir(scenario_id: int) -> "object":
     """반환 타입은 Path. 라우터에서도 동일 규칙 사용."""
     return settings.storage_dir / f"scenario_{scenario_id}" / "storyboard"
+
+
+# 등급 임계값 기본값 (사용자가 설정 안 했을 때)
+DEFAULT_GRADE_THRESHOLDS = {"s": 0.70, "aa": 0.30, "a": 0.05}
+
+
+def _user_grade_thresholds(user: User) -> dict:
+    """사용자별 등급 임계값. 미설정 시 기본값 반환."""
+    t = getattr(user, "grade_thresholds", None)
+    if not isinstance(t, dict):
+        return dict(DEFAULT_GRADE_THRESHOLDS)
+    # 키 누락된 경우 기본값으로 보강
+    out = dict(DEFAULT_GRADE_THRESHOLDS)
+    for k in ("s", "aa", "a"):
+        v = t.get(k)
+        if isinstance(v, (int, float)) and 0 < v < 1:
+            out[k] = float(v)
+    return out
 
 
 def resolve_character_references(
@@ -289,6 +312,14 @@ def _run(scenario_id: int) -> None:
         compute_asset_usage(locs_list, shots_list, shot_field="location")
         compute_asset_usage(props_list, shots_list, shot_field="props_used")
         compute_asset_usage(fx_list, shots_list, shot_field="fx_used")
+
+        # 난이도 등급 자동 분류 (사용자 임계값 적용)
+        thresholds = _user_grade_thresholds(user)
+        total = len(shots_list)
+        compute_character_grades(chars_list, total, thresholds=thresholds)
+        compute_asset_grades(locs_list, total, thresholds=thresholds)
+        compute_asset_grades(props_list, total, thresholds=thresholds)
+        compute_asset_grades(fx_list, total, thresholds=thresholds)
 
         sc.characters = chars_list
         sc.locations = locs_list

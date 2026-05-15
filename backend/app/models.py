@@ -34,6 +34,9 @@ class User(Base):
     name: Mapped[str] = mapped_column(String(255))
     picture: Mapped[str | None] = mapped_column(String(512), nullable=True)
     gemini_api_key: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    # 난이도 등급 임계값 (S/AA/A/C 분류 기준 비율, 0~1)
+    # 예: {"s": 0.7, "aa": 0.3, "a": 0.05} → S=70%+, AA=30~70%, A=5~30%, C=<5%
+    grade_thresholds: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     projects: Mapped[list["Project"]] = relationship(back_populates="owner")

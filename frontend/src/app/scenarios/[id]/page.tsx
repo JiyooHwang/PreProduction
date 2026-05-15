@@ -169,26 +169,38 @@ export default function ScenarioDetailPage() {
             <Section
               title="캐릭터"
               items={sc.characters}
-              keys={["name", "category", "description", "notes", "appearance_count", "shot_codes"]}
+              keys={["grade", "name", "category", "description", "notes", "appearance_count", "shot_codes"]}
               view={view}
+              scenarioId={id}
+              assetType="characters"
+              onChanged={() => mutate()}
             />
             <Section
               title="장소"
               items={sc.locations}
-              keys={["name", "category", "time_of_day", "description", "appearance_count", "shot_codes"]}
+              keys={["grade", "name", "category", "time_of_day", "description", "appearance_count", "shot_codes"]}
               view={view}
+              scenarioId={id}
+              assetType="locations"
+              onChanged={() => mutate()}
             />
             <Section
               title="소품/에셋"
               items={sc.props}
-              keys={["name", "category", "description", "appearance_count", "shot_codes"]}
+              keys={["grade", "name", "category", "description", "appearance_count", "shot_codes"]}
               view={view}
+              scenarioId={id}
+              assetType="props"
+              onChanged={() => mutate()}
             />
             <Section
               title="특수효과 (FX)"
               items={sc.fx}
-              keys={["name", "category", "description", "appearance_count", "shot_codes"]}
+              keys={["grade", "name", "category", "description", "appearance_count", "shot_codes"]}
               view={view}
+              scenarioId={id}
+              assetType="fx"
+              onChanged={() => mutate()}
             />
             <ShotsSection
               items={sc.shots}
@@ -275,11 +287,17 @@ function Section({
   items,
   keys,
   view,
+  scenarioId,
+  assetType,
+  onChanged,
 }: {
   title: string;
   items: any[] | null | undefined;
   keys: string[];
   view: ViewMode;
+  scenarioId?: number;
+  assetType?: "characters" | "locations" | "props" | "fx";
+  onChanged?: () => void;
 }) {
   if (!items || items.length === 0) {
     return (
@@ -311,7 +329,18 @@ function Section({
                 <tr key={i} className="border-b border-slate-100">
                   {keys.map((k) => (
                     <td key={k} className="px-3 py-2 align-top">
-                      {formatVal(it[k])}
+                      {k === "grade" && scenarioId && assetType ? (
+                        <GradeCell
+                          grade={it.grade}
+                          locked={!!it.grade_locked}
+                          scenarioId={scenarioId}
+                          assetType={assetType}
+                          assetIndex={i}
+                          onChanged={onChanged}
+                        />
+                      ) : (
+                        formatVal(it[k])
+                      )}
                     </td>
                   ))}
                 </tr>
@@ -325,6 +354,21 @@ function Section({
             <div key={i} className="border border-slate-200 rounded-lg p-3 text-sm">
               {keys.map((k) => {
                 const val = it[k];
+                if (k === "grade" && scenarioId && assetType) {
+                  return (
+                    <div key={k} className="mb-1 flex items-center gap-2">
+                      <span className="text-slate-500">등급:</span>
+                      <GradeCell
+                        grade={it.grade}
+                        locked={!!it.grade_locked}
+                        scenarioId={scenarioId}
+                        assetType={assetType}
+                        assetIndex={i}
+                        onChanged={onChanged}
+                      />
+                    </div>
+                  );
+                }
                 if (val === undefined || val === null || val === "") return null;
                 return (
                   <div key={k} className="mb-1">
@@ -365,6 +409,77 @@ const SHOT_KEYS = [
   "fx",
   "notes",
 ];
+
+const GRADE_COLORS: Record<string, string> = {
+  S: "bg-red-100 text-red-800 border-red-300",
+  AA: "bg-orange-100 text-orange-800 border-orange-300",
+  A: "bg-blue-100 text-blue-800 border-blue-300",
+  C: "bg-slate-100 text-slate-700 border-slate-300",
+};
+
+function GradeBadge({ grade }: { grade: string | null | undefined }) {
+  if (!grade) return <span className="text-slate-300 text-xs">—</span>;
+  const cls = GRADE_COLORS[grade] || "bg-slate-100 text-slate-700 border-slate-300";
+  return (
+    <span
+      className={`inline-block min-w-[32px] text-center text-xs font-bold px-2 py-0.5 rounded border ${cls}`}
+    >
+      {grade}
+    </span>
+  );
+}
+
+function GradeCell({
+  grade,
+  locked,
+  scenarioId,
+  assetType,
+  assetIndex,
+  onChanged,
+}: {
+  grade: string | null | undefined;
+  locked: boolean;
+  scenarioId: number;
+  assetType: "characters" | "locations" | "props" | "fx";
+  assetIndex: number;
+  onChanged?: () => void;
+}) {
+  const api = useApi();
+  const [busy, setBusy] = useState(false);
+
+  const change = async (next: string) => {
+    setBusy(true);
+    try {
+      const value = next === "AUTO" ? null : (next as "S" | "AA" | "A" | "C");
+      await api.updateAssetGrade(scenarioId, assetType, assetIndex, value);
+      onChanged?.();
+    } catch (e: any) {
+      alert("등급 변경 실패: " + (e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <GradeBadge grade={grade} />
+      <select
+        value={grade || ""}
+        onChange={(e) => change(e.target.value)}
+        disabled={busy}
+        className="text-xs border border-slate-300 rounded px-1 py-0.5 bg-white"
+        title={locked ? "수동 지정됨 (자동 분류로 되돌리려면 'AUTO' 선택)" : "자동 분류 상태"}
+      >
+        <option value="S">S</option>
+        <option value="AA">AA</option>
+        <option value="A">A</option>
+        <option value="C">C</option>
+        <option value="AUTO">— 자동 —</option>
+      </select>
+      {locked && <span className="text-xs text-amber-600" title="수동 지정">🔒</span>}
+    </div>
+  );
+}
 
 function shotCode(shot: any): string {
   const seq = shot?.sequence_number;

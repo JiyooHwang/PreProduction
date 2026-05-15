@@ -33,9 +33,10 @@ def export_scenario_excel(
     _make_sheet(
         wb,
         "캐릭터",
-        ["이름", "분류", "묘사", "비고", "등장 샷 수", "등장 샷 코드"],
+        ["등급", "이름", "분류", "묘사", "비고", "등장 샷 수", "등장 샷 코드"],
         [
             [
+                c.get("grade", ""),
                 c.get("name", ""),
                 c.get("category", ""),
                 c.get("description", ""),
@@ -45,16 +46,17 @@ def export_scenario_excel(
             ]
             for c in (characters or [])
         ],
-        widths=[20, 14, 40, 24, 10, 40],
+        widths=[8, 20, 14, 40, 24, 10, 40],
     )
 
     # ── 장소 ──────────────────────────────────────────
     _make_sheet(
         wb,
         "장소",
-        ["이름", "분류", "시간대", "묘사", "등장 샷 수", "등장 샷 코드"],
+        ["등급", "이름", "분류", "시간대", "묘사", "등장 샷 수", "등장 샷 코드"],
         [
             [
+                l.get("grade", ""),
                 l.get("name", ""),
                 l.get("category", ""),
                 l.get("time_of_day", ""),
@@ -64,16 +66,17 @@ def export_scenario_excel(
             ]
             for l in (locations or [])
         ],
-        widths=[20, 12, 14, 40, 10, 40],
+        widths=[8, 20, 12, 14, 40, 10, 40],
     )
 
     # ── 소품/에셋 ─────────────────────────────────────
     _make_sheet(
         wb,
         "소품_에셋",
-        ["이름", "분류", "묘사", "등장 샷 수", "등장 샷 코드"],
+        ["등급", "이름", "분류", "묘사", "등장 샷 수", "등장 샷 코드"],
         [
             [
+                p.get("grade", ""),
                 p.get("name", ""),
                 p.get("category", ""),
                 p.get("description", ""),
@@ -82,16 +85,17 @@ def export_scenario_excel(
             ]
             for p in (props or [])
         ],
-        widths=[20, 14, 40, 10, 40],
+        widths=[8, 20, 14, 40, 10, 40],
     )
 
     # ── FX ────────────────────────────────────────────
     _make_sheet(
         wb,
         "FX",
-        ["이름", "분류", "묘사", "등장 샷 수", "등장 샷 코드"],
+        ["등급", "이름", "분류", "묘사", "등장 샷 수", "등장 샷 코드"],
         [
             [
+                f.get("grade", ""),
                 f.get("name", ""),
                 f.get("category", ""),
                 f.get("description", ""),
@@ -100,7 +104,7 @@ def export_scenario_excel(
             ]
             for f in (fx or [])
         ],
-        widths=[20, 14, 40, 10, 40],
+        widths=[8, 20, 14, 40, 10, 40],
     )
 
     # ── 샷 리스트 (스토리보드 이미지 포함) ────────────

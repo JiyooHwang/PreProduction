@@ -107,6 +107,109 @@ def compute_asset_usage(
         asset["shot_codes"] = codes
 
 
+# 등급 정의 (기본 임계값, 사용자 설정 시 override):
+# S  = 주인공: main 카테고리 또는 전체 샷의 70%+ 등장
+# AA = 자주 등장하는 조연: 30~70% 등장 (이름 있는 주요 인물)
+# A  = 조연: 5~30% 등장 (이름 있고 대사 있음)
+# C  = 엑스트라: extra 카테고리 또는 5% 미만 등장
+GRADE_S = "S"
+GRADE_AA = "AA"
+GRADE_A = "A"
+GRADE_C = "C"
+
+DEFAULT_GRADE_THRESHOLDS = {"s": 0.70, "aa": 0.30, "a": 0.05}
+
+
+def _normalize_thresholds(thresholds: dict | None) -> dict:
+    """임계값 dict 검증 + 기본값 보강. 0~1 범위, S>=AA>=A 순."""
+    out = dict(DEFAULT_GRADE_THRESHOLDS)
+    if isinstance(thresholds, dict):
+        for k in ("s", "aa", "a"):
+            v = thresholds.get(k)
+            if isinstance(v, (int, float)) and 0 < v < 1:
+                out[k] = float(v)
+    # 순서 보장 (사용자가 이상하게 넣어도 안전하게)
+    s, aa, a = out["s"], out["aa"], out["a"]
+    if not (s >= aa >= a):
+        out["s"], out["aa"], out["a"] = sorted((s, aa, a), reverse=True)
+    return out
+
+
+def _compute_one_grade(category: str | None, ratio: float, thresholds: dict) -> str:
+    """카테고리 + 등장 비율 + 임계값으로 단일 등급 결정."""
+    cat = (category or "").lower().strip()
+    if cat == "main":
+        return GRADE_S
+    if cat == "extra":
+        return GRADE_C
+    if ratio >= thresholds["s"]:
+        return GRADE_S
+    if ratio >= thresholds["aa"]:
+        return GRADE_AA
+    if ratio >= thresholds["a"]:
+        return GRADE_A
+    return GRADE_C
+
+
+def compute_character_grades(
+    characters: list[dict],
+    total_shots: int,
+    *,
+    thresholds: dict | None = None,
+) -> None:
+    """캐릭터 리스트에 grade 필드를 자동 채움 (in-place).
+
+    이미 사용자가 grade 를 지정했다면 (grade_locked=True) 그대로 둠.
+    thresholds: {"s": 0.7, "aa": 0.3, "a": 0.05} 형식. 미지정 시 기본값.
+    """
+    if not characters:
+        return
+    t = _normalize_thresholds(thresholds)
+    total = max(total_shots, 1)
+    for c in characters:
+        if c.get("grade_locked"):
+            continue  # 수동 지정된 등급은 보존
+        count = int(c.get("appearance_count") or 0)
+        ratio = count / total
+        c["grade"] = _compute_one_grade(c.get("category"), ratio, t)
+
+
+def compute_asset_grades(
+    assets: list[dict],
+    total_shots: int,
+    *,
+    thresholds: dict | None = None,
+    main_categories: tuple[str, ...] = ("key_prop",),
+    extra_categories: tuple[str, ...] = ("minor_prop",),
+) -> None:
+    """소품/장소/FX 등 캐릭터 외 에셋의 grade 자동 채움.
+
+    main_categories → S 또는 등장 비율 기반.
+    extra_categories → C.
+    그 외엔 등장 비율로 분류.
+    """
+    if not assets:
+        return
+    t = _normalize_thresholds(thresholds)
+    total = max(total_shots, 1)
+    for a in assets:
+        if a.get("grade_locked"):
+            continue
+        cat = (a.get("category") or "").lower().strip()
+        count = int(a.get("appearance_count") or 0)
+        ratio = count / total
+        if cat in main_categories:
+            a["grade"] = _compute_one_grade(
+                "main" if ratio >= t["a"] else "supporting", ratio, t
+            )
+            if ratio < t["a"]:
+                a["grade"] = GRADE_A  # key 인데 1~2번만 → A
+        elif cat in extra_categories:
+            a["grade"] = GRADE_C
+        else:
+            a["grade"] = _compute_one_grade(None, ratio, t)
+
+
 def assign_shot_codes(
     items: list,
     *,

@@ -14,10 +14,23 @@ class UserOut(BaseModel):
     name: str
     picture: Optional[str] = None
     has_gemini_key: bool = False
+    grade_thresholds: Optional[dict] = None
 
 
 class GeminiKeyIn(BaseModel):
     api_key: str
+
+
+class GradeThresholdsIn(BaseModel):
+    """등급 분류 임계값. 0~1 사이 비율 (예: 0.7 = 70%)."""
+    s: float = 0.70
+    aa: float = 0.30
+    a: float = 0.05
+
+
+class AssetGradeIn(BaseModel):
+    """캐릭터/장소/소품/FX 의 등급 수동 지정 요청."""
+    grade: Optional[str] = None  # S / AA / A / C 또는 null (자동으로 되돌림)
 
 
 class ProjectCreate(BaseModel):
