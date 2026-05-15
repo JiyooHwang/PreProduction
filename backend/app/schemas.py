@@ -15,6 +15,7 @@ class UserOut(BaseModel):
     picture: Optional[str] = None
     has_gemini_key: bool = False
     grade_thresholds: Optional[dict] = None
+    unit_prices: Optional[dict] = None
 
 
 class GeminiKeyIn(BaseModel):
@@ -31,6 +32,17 @@ class GradeThresholdsIn(BaseModel):
 class AssetGradeIn(BaseModel):
     """캐릭터/장소/소품/FX 의 등급 수동 지정 요청."""
     grade: Optional[str] = None  # S / AA / A / C 또는 null (자동으로 되돌림)
+
+
+class UnitPricesIn(BaseModel):
+    """등급별 단가 (예산 계산용)."""
+    currency: str = "KRW"
+    assets: dict  # {"characters": {"S": .., "AA": .., "A": .., "C": ..}, ...}
+    shot_unit: float = 0.0
+
+
+class ScenarioBudgetIn(BaseModel):
+    budget: Optional[float] = None  # null 이면 예산 해제
 
 
 class ProjectCreate(BaseModel):
@@ -131,6 +143,7 @@ class ScenarioOut(BaseModel):
     storyboard_progress_done: int = 0
     storyboard_progress_total: int = 0
     storyboard_error: Optional[str] = None
+    budget: Optional[float] = None
     created_at: datetime
     finished_at: Optional[datetime] = None
 

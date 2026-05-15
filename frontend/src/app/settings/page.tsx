@@ -85,8 +85,190 @@ export default function SettingsPage() {
         </section>
 
         <GradeThresholdsSection />
+        <UnitPricesSection />
       </main>
     </div>
+  );
+}
+
+
+function UnitPricesSection() {
+  const api = useApi();
+  const { data: me, mutate } = api.me();
+  const cur = me?.unit_prices ?? null;
+
+  // 로컬 상태 (currency + 16개 단가 + shot_unit)
+  const [currency, setCurrency] = useState<string>("KRW");
+  const [chars, setChars] = useState({ S: 0, AA: 0, A: 0, C: 0 });
+  const [locs, setLocs] = useState({ S: 0, AA: 0, A: 0, C: 0 });
+  const [props_, setProps] = useState({ S: 0, AA: 0, A: 0, C: 0 });
+  const [fxs, setFxs] = useState({ S: 0, AA: 0, A: 0, C: 0 });
+  const [shotUnit, setShotUnit] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!cur) return;
+    setCurrency(cur.currency || "KRW");
+    setChars(cur.assets.characters);
+    setLocs(cur.assets.locations);
+    setProps(cur.assets.props);
+    setFxs(cur.assets.fx);
+    setShotUnit(cur.shot_unit);
+  }, [cur]);
+
+  const save = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      await api.setUnitPrices({
+        currency,
+        assets: { characters: chars, locations: locs, props: props_, fx: fxs },
+        shot_unit: shotUnit,
+      });
+      await mutate();
+      setMsg("저장되었습니다.");
+    } catch (e: any) {
+      setMsg(`저장 실패: ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reset = async () => {
+    if (!confirm("모든 단가를 0으로 초기화할까요?")) return;
+    setBusy(true);
+    setMsg(null);
+    try {
+      await api.resetUnitPrices();
+      await mutate();
+      setMsg("초기화되었습니다.");
+    } catch (e: any) {
+      setMsg(`초기화 실패: ${e.message}`);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fmt = (n: number) => (n ? n.toLocaleString() : "0");
+
+  const total =
+    chars.S + chars.AA + chars.A + chars.C +
+    locs.S + locs.AA + locs.A + locs.C +
+    props_.S + props_.AA + props_.A + props_.C +
+    fxs.S + fxs.AA + fxs.A + fxs.C +
+    shotUnit;
+
+  return (
+    <section className="bg-white rounded-2xl shadow p-6 mt-6">
+      <h2 className="font-semibold mb-1">등급별 단가 (예산 계산용)</h2>
+      <p className="text-sm text-slate-500 mb-4">
+        시나리오 분석 결과의 캐릭터/장소/소품/FX 를 자동 등급(S/AA/A/C) × 단가로 곱해서 총 비용을 산정합니다.
+        샷 단가는 샷 1개당 작업 비용입니다.
+      </p>
+
+      <div className="flex items-center gap-3 mb-4">
+        <label className="text-sm text-slate-600">통화:</label>
+        <select
+          value={currency}
+          onChange={(e) => setCurrency(e.target.value)}
+          className="border rounded-lg px-2 py-1 text-sm"
+        >
+          <option value="KRW">KRW (원)</option>
+          <option value="USD">USD ($)</option>
+          <option value="JPY">JPY (¥)</option>
+          <option value="EUR">EUR (€)</option>
+        </select>
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead className="bg-slate-50">
+            <tr>
+              <th className="text-left px-3 py-2 border-b font-medium">에셋 종류</th>
+              {(["S", "AA", "A", "C"] as const).map((g) => (
+                <th key={g} className="text-left px-3 py-2 border-b font-medium">
+                  {g}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <PriceRow label="캐릭터" values={chars} onChange={setChars} />
+            <PriceRow label="장소/배경" values={locs} onChange={setLocs} />
+            <PriceRow label="소품/에셋" values={props_} onChange={setProps} />
+            <PriceRow label="특수효과 (FX)" values={fxs} onChange={setFxs} />
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-4 flex items-center gap-3">
+        <label className="text-sm text-slate-600 whitespace-nowrap">샷 단가 (1샷):</label>
+        <input
+          type="number"
+          min={0}
+          value={shotUnit}
+          onChange={(e) => setShotUnit(Number(e.target.value) || 0)}
+          className="border rounded-lg px-3 py-2 text-sm w-40"
+        />
+        <span className="text-xs text-slate-500">{fmt(shotUnit)} {currency}</span>
+      </div>
+
+      {total === 0 && (
+        <div className="mt-3 text-xs text-amber-600">
+          단가가 모두 0이라 예산 계산이 0으로 나옵니다. 회사 기준에 맞게 입력해주세요.
+        </div>
+      )}
+
+      <div className="flex gap-2 mt-5">
+        <button
+          onClick={save}
+          disabled={busy}
+          className="bg-slate-900 text-white px-5 py-2 rounded-lg disabled:opacity-50"
+        >
+          저장
+        </button>
+        <button
+          onClick={reset}
+          disabled={busy}
+          className="bg-slate-100 text-slate-700 px-5 py-2 rounded-lg disabled:opacity-50"
+        >
+          모두 0으로 초기화
+        </button>
+      </div>
+      {msg && <div className="mt-3 text-sm text-slate-600">{msg}</div>}
+    </section>
+  );
+}
+
+
+function PriceRow({
+  label,
+  values,
+  onChange,
+}: {
+  label: string;
+  values: { S: number; AA: number; A: number; C: number };
+  onChange: (v: { S: number; AA: number; A: number; C: number }) => void;
+}) {
+  return (
+    <tr className="border-b">
+      <td className="px-3 py-2 font-medium">{label}</td>
+      {(["S", "AA", "A", "C"] as const).map((g) => (
+        <td key={g} className="px-3 py-2">
+          <input
+            type="number"
+            min={0}
+            value={values[g]}
+            onChange={(e) =>
+              onChange({ ...values, [g]: Number(e.target.value) || 0 })
+            }
+            className="w-32 border rounded px-2 py-1 text-sm"
+            placeholder="0"
+          />
+        </td>
+      ))}
+    </tr>
   );
 }
 

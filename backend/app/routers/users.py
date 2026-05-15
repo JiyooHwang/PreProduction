@@ -5,9 +5,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from ..auth import get_current_user
+from ..budget import normalize_prices
 from ..database import get_db
 from ..models import User
-from ..schemas import GeminiKeyIn, GradeThresholdsIn, UserOut
+from ..schemas import GeminiKeyIn, GradeThresholdsIn, UnitPricesIn, UserOut
 
 
 router = APIRouter(prefix="/api/me", tags=["me"])
@@ -24,6 +25,7 @@ def _to_out(user: User) -> UserOut:
         picture=user.picture,
         has_gemini_key=bool(user.gemini_api_key),
         grade_thresholds=user.grade_thresholds or DEFAULT_GRADE_THRESHOLDS,
+        unit_prices=normalize_prices(user.unit_prices),
     )
 
 
@@ -88,6 +90,44 @@ def reset_grade_thresholds(
 ) -> UserOut:
     """임계값을 기본값으로 되돌림."""
     user.grade_thresholds = None
+    db.commit()
+    db.refresh(user)
+    return _to_out(user)
+
+
+@router.put("/unit-prices", response_model=UserOut)
+def set_unit_prices(
+    payload: UnitPricesIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserOut:
+    """등급별 단가 저장.
+
+    구조: {"currency": "KRW",
+           "assets": {"characters": {"S":.., "AA":.., "A":.., "C":..}, ...},
+           "shot_unit": <샷 단가>}
+    음수 값은 0으로 보정. 다른 비숫자 값은 무시.
+    """
+    normalized = normalize_prices(
+        {
+            "currency": payload.currency,
+            "assets": payload.assets,
+            "shot_unit": payload.shot_unit,
+        }
+    )
+    user.unit_prices = normalized
+    db.commit()
+    db.refresh(user)
+    return _to_out(user)
+
+
+@router.delete("/unit-prices", response_model=UserOut)
+def reset_unit_prices(
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> UserOut:
+    """단가를 초기화 (모두 0)."""
+    user.unit_prices = None
     db.commit()
     db.refresh(user)
     return _to_out(user)

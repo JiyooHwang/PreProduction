@@ -37,6 +37,11 @@ class User(Base):
     # 난이도 등급 임계값 (S/AA/A/C 분류 기준 비율, 0~1)
     # 예: {"s": 0.7, "aa": 0.3, "a": 0.05} → S=70%+, AA=30~70%, A=5~30%, C=<5%
     grade_thresholds: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+    # 에셋 등급별 단가 (예산 계산용)
+    # 구조: {"currency": "KRW",
+    #        "assets": {"characters": {"S": .., "AA": .., "A": .., "C": ..}, ...},
+    #        "shot_unit": <샷 단가>}
+    unit_prices: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     projects: Mapped[list["Project"]] = relationship(back_populates="owner")
@@ -137,6 +142,9 @@ class Scenario(Base):
     storyboard_progress_done: Mapped[int] = mapped_column(Integer, default=0)
     storyboard_progress_total: Mapped[int] = mapped_column(Integer, default=0)
     storyboard_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    # 프로젝트 예산 (원 단위, 사용자 입력)
+    budget: Mapped[float | None] = mapped_column(Float, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

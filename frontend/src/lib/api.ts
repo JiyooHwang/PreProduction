@@ -67,6 +67,33 @@ export function formatShotCode(
   return `S${pad(seq)}_C${pad(num)}`;
 }
 
+export type UnitPrices = {
+  currency: string;
+  assets: {
+    characters: { S: number; AA: number; A: number; C: number };
+    locations: { S: number; AA: number; A: number; C: number };
+    props: { S: number; AA: number; A: number; C: number };
+    fx: { S: number; AA: number; A: number; C: number };
+  };
+  shot_unit: number;
+};
+
+export type BudgetAnalysis = {
+  currency: string;
+  budget: number | null;
+  total_cost: number;
+  diff: number | null;
+  breakdown: {
+    characters: Record<string, { count: number; unit_price: number; subtotal: number }>;
+    locations: Record<string, { count: number; unit_price: number; subtotal: number }>;
+    props: Record<string, { count: number; unit_price: number; subtotal: number }>;
+    fx: Record<string, { count: number; unit_price: number; subtotal: number }>;
+    shots: { count: number; unit_price: number; subtotal: number };
+  };
+  asset_totals: { characters: number; locations: number; props: number; fx: number };
+  suggestions: { type: string; message: string }[];
+};
+
 export type Me = {
   id: number;
   email: string;
@@ -74,6 +101,7 @@ export type Me = {
   picture: string | null;
   has_gemini_key: boolean;
   grade_thresholds: { s: number; aa: number; a: number } | null;
+  unit_prices: UnitPrices | null;
 };
 
 function useToken(): string | null {
@@ -136,6 +164,34 @@ export function useApi() {
 
     resetGradeThresholds: async () =>
       (await request(token, "/api/me/grade-thresholds", { method: "DELETE" })).json() as Promise<Me>,
+
+    setUnitPrices: async (prices: UnitPrices) =>
+      (
+        await request(token, "/api/me/unit-prices", {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(prices),
+        })
+      ).json() as Promise<Me>,
+
+    resetUnitPrices: async () =>
+      (await request(token, "/api/me/unit-prices", { method: "DELETE" })).json() as Promise<Me>,
+
+    setScenarioBudget: async (scenarioId: number, budget: number | null) =>
+      (
+        await request(token, `/api/scenarios/${scenarioId}/budget`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ budget }),
+        })
+      ).json() as Promise<ScenarioOut>,
+
+    scenarioBudgetAnalysis: (id: number, config?: SWRConfiguration) =>
+      useSWR<BudgetAnalysis>(
+        token && id ? `/api/scenarios/${id}/budget-analysis` : null,
+        fetcher,
+        config,
+      ),
 
     updateAssetGrade: async (
       scenarioId: number,
@@ -336,6 +392,7 @@ export interface ScenarioOut extends ScenarioListItem {
   storyboard_progress_done: number;
   storyboard_progress_total: number;
   storyboard_error: string | null;
+  budget: number | null;
 }
 
 export async function authedFetch(token: string, path: string, init?: RequestInit) {

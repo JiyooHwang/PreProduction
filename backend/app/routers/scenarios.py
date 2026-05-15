@@ -18,9 +18,11 @@ from ..auth import get_current_user
 from ..config import settings
 from ..database import get_db
 from ..models import CharacterDesign, JobStatus, Scenario, User
+from ..budget import calculate as calculate_budget
 from ..schemas import (
     AssetGradeIn,
     CharacterDesignOut,
+    ScenarioBudgetIn,
     ScenarioCreate,
     ScenarioListItem,
     ScenarioOut,
@@ -344,6 +346,50 @@ def update_asset_grade(
     db.commit()
     db.refresh(sc)
     return ScenarioOut.model_validate(sc)
+
+
+@router.put("/{scenario_id}/budget", response_model=ScenarioOut)
+def set_scenario_budget(
+    scenario_id: int,
+    payload: ScenarioBudgetIn,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> ScenarioOut:
+    sc = db.get(Scenario, scenario_id)
+    if not sc or sc.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="시나리오를 찾을 수 없습니다.")
+
+    if payload.budget is None:
+        sc.budget = None
+    else:
+        if payload.budget < 0:
+            raise HTTPException(status_code=400, detail="예산은 0 이상이어야 합니다.")
+        sc.budget = float(payload.budget)
+    db.commit()
+    db.refresh(sc)
+    return ScenarioOut.model_validate(sc)
+
+
+@router.get("/{scenario_id}/budget-analysis")
+def get_scenario_budget_analysis(
+    scenario_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """현재 분석 결과 + 사용자 단가로 예산 분석 (cost breakdown + 제안)."""
+    sc = db.get(Scenario, scenario_id)
+    if not sc or sc.owner_id != user.id:
+        raise HTTPException(status_code=404, detail="시나리오를 찾을 수 없습니다.")
+
+    return calculate_budget(
+        characters=sc.characters or [],
+        locations=sc.locations or [],
+        props=sc.props or [],
+        fx=sc.fx or [],
+        shots=sc.shots or [],
+        prices=user.unit_prices or {},
+        budget=sc.budget,
+    )
 
 
 @router.get("/{scenario_id}/export.xlsx")

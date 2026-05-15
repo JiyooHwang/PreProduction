@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 
 import { Header } from "@/components/Header";
-import { useApi } from "@/lib/api";
+import { useApi, type BudgetAnalysis, type ScenarioOut } from "@/lib/api";
 
 type ViewMode = "table" | "card";
 
@@ -139,6 +139,8 @@ export default function ScenarioDetailPage() {
 
         {sc?.status === "done" && <StoryboardUsageHint />}
 
+        {sc?.status === "done" && <BudgetCard scenarioId={id} sc={sc} onChanged={() => mutate()} />}
+
         {sc?.status === "done" && (
           <>
             <div className="flex gap-2 mb-4">
@@ -266,6 +268,248 @@ function StoryboardUsageHint() {
     </div>
   );
 }
+
+function BudgetCard({
+  scenarioId,
+  sc,
+  onChanged,
+}: {
+  scenarioId: number;
+  sc: ScenarioOut;
+  onChanged: () => void;
+}) {
+  const api = useApi();
+  const { data: analysis, mutate: refresh } = api.scenarioBudgetAnalysis(scenarioId, {
+    refreshInterval: 0,
+  });
+  const [budgetInput, setBudgetInput] = useState<string>(
+    sc.budget != null ? String(sc.budget) : "",
+  );
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setBudgetInput(sc.budget != null ? String(sc.budget) : "");
+  }, [sc.budget]);
+
+  const save = async () => {
+    setBusy(true);
+    try {
+      const v = budgetInput.trim() === "" ? null : Number(budgetInput);
+      if (v !== null && (Number.isNaN(v) || v < 0)) {
+        alert("예산은 0 이상의 숫자여야 합니다.");
+        return;
+      }
+      await api.setScenarioBudget(scenarioId, v);
+      onChanged();
+      await refresh();
+    } catch (e: any) {
+      alert("저장 실패: " + (e?.message || e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const fmt = (n: number | null | undefined) => {
+    if (n == null) return "—";
+    return Math.round(n).toLocaleString();
+  };
+  const currency = analysis?.currency || "KRW";
+
+  return (
+    <div className="bg-white rounded-2xl shadow p-5 mb-6">
+      <h2 className="font-semibold mb-3">💰 예산 분석</h2>
+
+      <div className="flex flex-wrap items-end gap-3 mb-4">
+        <div>
+          <label className="block text-xs text-slate-500 mb-1">프로젝트 예산</label>
+          <input
+            type="number"
+            min={0}
+            value={budgetInput}
+            onChange={(e) => setBudgetInput(e.target.value)}
+            placeholder="예: 10000000"
+            className="border rounded-lg px-3 py-2 text-sm w-48"
+          />
+        </div>
+        <button
+          onClick={save}
+          disabled={busy}
+          className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+        >
+          예산 저장
+        </button>
+        <a href="/settings" className="text-xs text-slate-500 underline ml-2">
+          단가 설정 →
+        </a>
+      </div>
+
+      {!analysis ? (
+        <div className="text-sm text-slate-500">계산 중...</div>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+            <StatBox
+              label="예상 비용"
+              value={fmt(analysis.total_cost) + " " + currency}
+              tone="neutral"
+            />
+            <StatBox
+              label="예산"
+              value={analysis.budget != null ? fmt(analysis.budget) + " " + currency : "미설정"}
+              tone="neutral"
+            />
+            <StatBox
+              label="차액 (예산 - 비용)"
+              value={
+                analysis.diff == null
+                  ? "—"
+                  : (analysis.diff >= 0 ? "+" : "") + fmt(analysis.diff) + " " + currency
+              }
+              tone={analysis.diff == null ? "neutral" : analysis.diff >= 0 ? "good" : "bad"}
+            />
+          </div>
+
+          {/* 진행률 바 */}
+          {analysis.budget != null && analysis.budget > 0 && (
+            <div className="mb-4">
+              <div className="text-xs text-slate-500 mb-1">예산 대비 사용률</div>
+              <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+                {(() => {
+                  const pct = Math.min(
+                    Math.round((analysis.total_cost / analysis.budget) * 100),
+                    150,
+                  );
+                  const color =
+                    pct > 100 ? "bg-red-500" : pct > 90 ? "bg-amber-500" : "bg-emerald-500";
+                  return <div className={`${color} h-full transition-all`} style={{ width: `${Math.min(pct, 100)}%` }} />;
+                })()}
+              </div>
+              <div className="text-xs text-slate-500 mt-1">
+                {Math.round((analysis.total_cost / analysis.budget) * 100)}%
+              </div>
+            </div>
+          )}
+
+          {/* 분류별 합계 */}
+          <div className="overflow-x-auto mb-4">
+            <table className="w-full text-sm border-collapse">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="text-left px-3 py-2 border-b font-medium">분류</th>
+                  <th className="text-right px-3 py-2 border-b font-medium">S</th>
+                  <th className="text-right px-3 py-2 border-b font-medium">AA</th>
+                  <th className="text-right px-3 py-2 border-b font-medium">A</th>
+                  <th className="text-right px-3 py-2 border-b font-medium">C</th>
+                  <th className="text-right px-3 py-2 border-b font-medium">소계</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(["characters", "locations", "props", "fx"] as const).map((t) => {
+                  const row = analysis.breakdown[t];
+                  const totalForType = analysis.asset_totals[t];
+                  return (
+                    <tr key={t} className="border-b">
+                      <td className="px-3 py-2 font-medium">{labelFor(t)}</td>
+                      {(["S", "AA", "A", "C"] as const).map((g) => {
+                        const cell = row[g];
+                        return (
+                          <td key={g} className="px-3 py-2 text-right">
+                            {cell.count > 0 ? (
+                              <span title={`${cell.count}개 × ${fmt(cell.unit_price)}`}>
+                                {cell.count} × {fmt(cell.unit_price)}
+                                <br />
+                                <span className="text-xs text-slate-500">
+                                  = {fmt(cell.subtotal)}
+                                </span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-300">—</span>
+                            )}
+                          </td>
+                        );
+                      })}
+                      <td className="px-3 py-2 text-right font-semibold">
+                        {fmt(totalForType)}
+                      </td>
+                    </tr>
+                  );
+                })}
+                <tr className="border-b bg-slate-50">
+                  <td className="px-3 py-2 font-medium">샷</td>
+                  <td colSpan={4} className="px-3 py-2 text-right">
+                    {analysis.breakdown.shots.count} 샷 × {fmt(analysis.breakdown.shots.unit_price)}
+                  </td>
+                  <td className="px-3 py-2 text-right font-semibold">
+                    {fmt(analysis.breakdown.shots.subtotal)}
+                  </td>
+                </tr>
+                <tr className="font-bold bg-slate-100">
+                  <td className="px-3 py-2">합계</td>
+                  <td colSpan={4}></td>
+                  <td className="px-3 py-2 text-right">{fmt(analysis.total_cost)} {currency}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+
+          {/* 제안 */}
+          {analysis.suggestions.length > 0 && (
+            <div className="rounded-lg border border-slate-200 overflow-hidden">
+              {analysis.suggestions.map((s, i) => {
+                const bg =
+                  s.type === "reduce"
+                    ? "bg-red-50 text-red-900"
+                    : s.type === "invest"
+                      ? "bg-emerald-50 text-emerald-900"
+                      : s.type === "ok"
+                        ? "bg-blue-50 text-blue-900"
+                        : "bg-slate-50 text-slate-700";
+                return (
+                  <div key={i} className={`${bg} px-3 py-2 text-sm border-b last:border-b-0`}>
+                    {s.message}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
+function StatBox({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone: "good" | "bad" | "neutral";
+}) {
+  const cls =
+    tone === "good"
+      ? "bg-emerald-50 border-emerald-200"
+      : tone === "bad"
+        ? "bg-red-50 border-red-200"
+        : "bg-slate-50 border-slate-200";
+  return (
+    <div className={`border rounded-lg p-3 ${cls}`}>
+      <div className="text-xs text-slate-500 mb-1">{label}</div>
+      <div className="font-semibold text-lg">{value}</div>
+    </div>
+  );
+}
+
+function labelFor(t: string) {
+  return {
+    characters: "캐릭터",
+    locations: "장소/배경",
+    props: "소품/에셋",
+    fx: "특수효과",
+  }[t] || t;
+}
+
 
 function statusLabel(s: string) {
   switch (s) {
